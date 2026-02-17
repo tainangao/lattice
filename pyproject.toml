@@ -7,6 +7,8 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi",
     "langgraph",
+    "neo4j",
+    "neo4j-graphrag",
     "pydantic",
     "streamlit",
 ]
