@@ -94,7 +94,7 @@ def _rows_from_seed_documents(
 
 def main() -> int:
     supabase_url = _env("SUPABASE_URL")
-    supabase_key = _env("SUPABASE_SERVICE_ROLE_KEY", _env("SUPABASE_KEY"))
+    supabase_key = _env("SUPABASE_SERVICE_ROLE_KEY")
     table = os.getenv("SUPABASE_DOCUMENTS_TABLE", "embeddings")
     docs_path = Path(
         os.getenv("PROTOTYPE_DOCS_PATH", "data/prototype/private_documents.json")

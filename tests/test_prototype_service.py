@@ -14,6 +14,7 @@ def _test_config() -> AppConfig:
         use_real_supabase=False,
         use_real_neo4j=False,
         allow_seeded_fallback=True,
+        allow_service_role_for_retrieval=False,
         neo4j_uri=None,
         neo4j_username=None,
         neo4j_password=None,

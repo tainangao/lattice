@@ -13,6 +13,7 @@ class AppConfig:
     use_real_supabase: bool
     use_real_neo4j: bool
     allow_seeded_fallback: bool
+    allow_service_role_for_retrieval: bool
     neo4j_uri: str | None
     neo4j_username: str | None
     neo4j_password: str | None
@@ -64,6 +65,9 @@ def load_config() -> AppConfig:
         use_real_supabase=_read_bool_env("USE_REAL_SUPABASE", default=False),
         use_real_neo4j=_read_bool_env("USE_REAL_NEO4J", default=False),
         allow_seeded_fallback=_read_bool_env("ALLOW_SEEDED_FALLBACK", default=True),
+        allow_service_role_for_retrieval=_read_bool_env(
+            "ALLOW_SERVICE_ROLE_FOR_RETRIEVAL", default=False
+        ),
         neo4j_uri=_read_optional_env("NEO4J_URI"),
         neo4j_username=_read_optional_env("NEO4J_USERNAME"),
         neo4j_password=_read_optional_env("NEO4J_PASSWORD"),
@@ -77,3 +81,11 @@ def load_config() -> AppConfig:
             "PROTOTYPE_GRAPH_PATH", "data/prototype/graph_edges.json"
         ),
     )
+
+
+def select_supabase_retrieval_key(config: AppConfig) -> tuple[str | None, str | None]:
+    if config.supabase_key:
+        return config.supabase_key, "SUPABASE_KEY"
+    if config.allow_service_role_for_retrieval and config.supabase_service_role_key:
+        return config.supabase_service_role_key, "SUPABASE_SERVICE_ROLE_KEY"
+    return None, None

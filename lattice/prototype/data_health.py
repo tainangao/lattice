@@ -5,7 +5,7 @@ from typing import Any
 from neo4j import GraphDatabase
 from supabase import create_client
 
-from lattice.prototype.config import AppConfig
+from lattice.prototype.config import AppConfig, select_supabase_retrieval_key
 
 
 def build_data_health_report(config: AppConfig) -> dict[str, Any]:
@@ -21,6 +21,7 @@ def build_data_health_report(config: AppConfig) -> dict[str, Any]:
             "use_real_supabase": config.use_real_supabase,
             "use_real_neo4j": config.use_real_neo4j,
             "allow_seeded_fallback": config.allow_seeded_fallback,
+            "allow_service_role_for_retrieval": config.allow_service_role_for_retrieval,
         },
         "supabase": supabase_report,
         "neo4j": neo4j_report,
@@ -31,11 +32,11 @@ def _check_supabase(config: AppConfig) -> dict[str, Any]:
     if not config.use_real_supabase:
         return {"status": "skipped", "reason": "USE_REAL_SUPABASE=false"}
 
-    key = config.supabase_service_role_key or config.supabase_key
+    key, key_source = select_supabase_retrieval_key(config)
     if not config.supabase_url or not key:
         return {
             "status": "error",
-            "reason": "SUPABASE_URL and key are required for real mode",
+            "reason": "SUPABASE_URL and retrieval key are required for real mode",
         }
 
     try:
@@ -59,9 +60,7 @@ def _check_supabase(config: AppConfig) -> dict[str, Any]:
             "row_count": row_count,
             "sampled_rows": len(rows),
             "sample_empty_content_rows": empty_content_rows,
-            "key_source": "SUPABASE_SERVICE_ROLE_KEY"
-            if config.supabase_service_role_key
-            else "SUPABASE_KEY",
+            "key_source": key_source,
         }
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "reason": str(exc)}

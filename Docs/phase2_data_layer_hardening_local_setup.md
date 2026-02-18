@@ -31,6 +31,7 @@ Runtime toggles:
 - `USE_REAL_SUPABASE` (default `false`)
 - `USE_REAL_NEO4J` (default `false`)
 - `ALLOW_SEEDED_FALLBACK` (default `true`)
+- `ALLOW_SERVICE_ROLE_FOR_RETRIEVAL` (default `false`, diagnostics only)
 
 Recommended for Neo4j/Aura:
 
@@ -140,6 +141,8 @@ Expected response includes:
 - Keep `SUPABASE_KEY` aligned with the mode you are testing:
   - anon key for user-facing read paths,
   - service-role key for ingestion/admin workflows.
+- Retrieval path uses `SUPABASE_KEY` by default for least privilege.
+- `SUPABASE_SERVICE_ROLE_KEY` is only used for retrieval when `ALLOW_SERVICE_ROLE_FOR_RETRIEVAL=true`.
 
 ## Next implementation step after setup
 
@@ -167,6 +170,8 @@ Private documents to Supabase:
 set -a && source .env && set +a
 uv run python scripts/ingestion/ingest_private_documents.py
 ```
+
+Note: this ingestion script requires `SUPABASE_SERVICE_ROLE_KEY`.
 
 Graph edges to Neo4j:
 

@@ -12,16 +12,18 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from lattice.prototype.config import load_config
+from lattice.prototype.config import AppConfig, load_config
 from lattice.prototype.data_health import build_data_health_report
 
 
-def _fetch_supabase_rows(report: dict[str, Any], config: Any) -> list[dict[str, Any]]:
+def _fetch_supabase_rows(
+    report: dict[str, Any], config: AppConfig
+) -> list[dict[str, Any]]:
     supabase_status = report.get("supabase", {})
     if supabase_status.get("status") != "ok":
         return []
 
-    key = config.supabase_service_role_key or config.supabase_key
+    key = config.supabase_service_role_key
     if not config.supabase_url or not key:
         return []
 
@@ -74,6 +76,11 @@ def main() -> int:
 
     supabase_rows = _fetch_supabase_rows(report=report, config=config)
     report["supabase_quality"] = _supabase_quality_checks(supabase_rows)
+    if not config.supabase_service_role_key:
+        report["supabase_quality"] = {
+            "status": "skipped",
+            "reason": "SUPABASE_SERVICE_ROLE_KEY is required for full quality validation",
+        }
 
     print(json.dumps(report, indent=2))
 

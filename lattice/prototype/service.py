@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Protocol
 
-from lattice.prototype.config import AppConfig
+from lattice.prototype.config import AppConfig, select_supabase_retrieval_key
 from lattice.prototype.models import QueryResponse, RetrievalMode, SourceSnippet
 from lattice.prototype.retrievers.document_retriever import (
     SeedDocumentRetriever,
@@ -118,7 +118,7 @@ async def _run_retriever_with_fallback(
 def _build_document_retriever(config: AppConfig) -> Retriever | None:
     if not config.use_real_supabase:
         return None
-    supabase_key = config.supabase_service_role_key or config.supabase_key
+    supabase_key, _ = select_supabase_retrieval_key(config)
     if not config.supabase_url or not supabase_key:
         return None
     return SupabaseDocumentRetriever(

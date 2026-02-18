@@ -128,15 +128,16 @@ Start with Steps 1-5 (retriever integration and tests), then proceed to Steps 6-
 ### Next actions (Phase 2 hardening)
 
 1. **Data quality gates after ingestion**
-   - Add a validation command to check Supabase and Neo4j health plus basic quality signals.
-   - Checks include row/node counts, empty content rows, and duplicate source-chunk keys.
+   - Implemented: validation command checks Supabase and Neo4j health plus quality signals.
+   - Added: `scripts/ingestion/validate_phase2_data.py` and `/health/data` support data outputs.
 
 2. **Operational fallback visibility**
-   - Add `/health/data` endpoint to report real/seeded mode, fallback policy, and data-source readiness.
+   - Implemented: `/health/data` reports real/seeded mode, fallback policy, and source readiness.
 
 3. **RLS and key-path alignment**
-   - Keep service-role for ingestion paths.
-   - Move user-facing retrieval toward anon/authenticated flow with RLS-only access.
+   - In progress: enforce least-privilege retrieval key selection (`SUPABASE_KEY` first).
+   - Keep service-role strictly for ingestion/validation admin paths.
+   - Add explicit opt-in flag for service-role retrieval fallback in local diagnostics.
 
 4. **Retriever quality follow-up**
    - Add stronger ranking/reranking for mixed graph queries and reduce irrelevant fallback snippets.
