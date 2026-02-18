@@ -1,7 +1,3 @@
-Here is the updated design document. I have integrated the **Agent-G** framework concepts (Retriever Bank, Critic Module, and Feedback Loops) into the **Core Agentic Architecture** section while maintaining the original document structure and technical stack.
-
----
-
 # gemini3_agentic_rag_app_plan.md
 
 ## Overview
@@ -24,6 +20,42 @@ This document outlines the design for an agentic RAG application tailored for co
 * **Database (Graph):** Neo4j (AuraDB)
 * **LLM & Embeddings:** Google Gemini (via AI Studio)
 * **Graph SDK:** `neo4j-graphrag` (Python package)
+
+---
+
+## Delivery Phases (Prototype-First)
+
+This plan follows a prototype-first delivery sequence so stakeholders can see results early before deeper platform hardening.
+
+### Phase 1: Working Prototype (Result First)
+
+* Deliver a Chainlit demo with one happy-path multi-source question flow.
+* Enable basic routing and simplified retrievers for Supabase + Neo4j.
+* Return grounded answers with source references.
+
+### Phase 2: Data Layer Hardening & Ingestion
+
+* Finalize Supabase and Neo4j data models and access patterns.
+* Harden private file and shared graph ingestion pipelines.
+* Enforce RLS and add ingestion quality checks.
+
+### Phase 3: Core Agentic Orchestration (Scale from Prototype)
+
+* Implement full LangGraph fan-out/fan-in state transitions.
+* Improve routing logic and retrieval quality.
+* Add telemetry for route and retrieval outcomes.
+
+### Phase 4: Critic, Feedback Loops, and Answer Quality
+
+* Add critic scoring and low-confidence detection.
+* Trigger selective re-query/refinement loops.
+* Enforce source-grounded synthesis behavior.
+
+### Phase 5: Frontend, Security, and Production
+
+* Polish UI and onboarding for real usage.
+* Complete security hardening and stateless key handling.
+* Dockerize and deploy to HuggingFace Spaces.
 
 ---
 
@@ -77,7 +109,7 @@ These processes run concurrently using Python `asyncio`, acting as specialized a
 
 ## User Journey & UX (Chainlit Interface)
 
-### Phase 1: Onboarding (The "Cold Start" Fix)
+### Step 1: Onboarding (The "Cold Start" Fix)
 
 To reduce friction, we remove the immediate requirement for an API Key.
 
@@ -89,7 +121,7 @@ To reduce friction, we remove the immediate requirement for an API Key.
 
 
 
-### Phase 2: The Chat Experience
+### Step 2: The Chat Experience
 
 Chainlit provides native UI elements for agentic visibility.
 
@@ -118,7 +150,7 @@ Chainlit provides native UI elements for agentic visibility.
 1. User uploads file via Chainlit UI.
 2. File is parsed into normalized text for chunking.
 3. Text is chunked (parent-child chunking) and embedded.
-4. stored in Supabase `embeddings` table with `user_id`.
+4. Stored in Supabase `embeddings` table with `user_id`.
 
 
 
