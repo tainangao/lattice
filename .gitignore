@@ -1,12 +1,38 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.pyo
+*.pyd
+*.so
 build/
 dist/
 wheels/
-*.egg-info
+.eggs/
+*.egg-info/
 
-# Virtual environments
-.venv
-.idea
+# Virtual environments and IDE files
+.venv/
+venv/
+.idea/
+.vscode/
 .DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test, lint, and type-check caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local temp artifacts
+.tmp/
+*.log
+
+# Chainlit local artifacts
+.chainlit/cache/
+.chainlit/translations/
