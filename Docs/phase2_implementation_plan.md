@@ -135,12 +135,17 @@ Start with Steps 1-5 (retriever integration and tests), then proceed to Steps 6-
    - Implemented: `/health/data` reports real/seeded mode, fallback policy, and source readiness.
 
 3. **RLS and key-path alignment**
-   - In progress: enforce least-privilege retrieval key selection (`SUPABASE_KEY` first).
-   - Keep service-role strictly for ingestion/validation admin paths.
-   - Add explicit opt-in flag for service-role retrieval fallback in local diagnostics.
+   - Implemented: least-privilege retrieval key selection (`SUPABASE_KEY` first).
+   - Implemented: service-role reserved for ingestion/validation admin paths.
+   - Added: explicit opt-in flag `ALLOW_SERVICE_ROLE_FOR_RETRIEVAL` for local diagnostics.
 
 4. **Retriever quality follow-up**
    - Add stronger ranking/reranking for mixed graph queries and reduce irrelevant fallback snippets.
 
 5. **Integration test coverage**
-   - Add env-gated integration tests for Supabase and Neo4j retrieval with fallback disabled.
+   - Implemented: env-gated integration tests for Supabase and Neo4j retrieval with fallback disabled.
+   - Added:
+     - `tests/integration/test_supabase_retrieval.py`
+     - `tests/integration/test_neo4j_retrieval.py`
+   - Execution: `uv run pytest -m integration`
+   - Current constraint: Supabase integration test uses service-role retrieval opt-in until user-auth JWT retrieval path is implemented.

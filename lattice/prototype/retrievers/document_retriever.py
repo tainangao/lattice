@@ -8,7 +8,7 @@ from typing import Any
 from supabase import Client, create_client
 
 from lattice.prototype.models import SourceSnippet
-from lattice.prototype.retrievers.scoring import overlap_score
+from lattice.prototype.retrievers.scoring import overlap_score, tokenize
 
 
 class SeedDocumentRetriever:
@@ -45,7 +45,7 @@ class SupabaseDocumentRetriever:
         return await asyncio.to_thread(self._retrieve_sync, question, limit)
 
     def _retrieve_sync(self, question: str, limit: int) -> list[SourceSnippet]:
-        rows = self._fetch_candidate_rows(max(limit * 12, 30))
+        rows = self._fetch_candidate_rows(question, max(limit * 20, 100))
         ranked = sorted(
             rows,
             key=lambda item: overlap_score(question, _row_content(item)),
@@ -64,17 +64,24 @@ class SupabaseDocumentRetriever:
             for item in top_rows
         ]
 
-    def _fetch_candidate_rows(self, fetch_limit: int) -> list[dict[str, Any]]:
-        response = (
-            self._client.table(self._table_name)
-            .select("*")
-            .limit(fetch_limit)
-            .execute()
-        )
+    def _fetch_candidate_rows(
+        self,
+        question: str,
+        fetch_limit: int,
+    ) -> list[dict[str, Any]]:
+        response = self._query_candidate_rows(question, fetch_limit)
         rows = response.data
         if not isinstance(rows, list):
             return []
         return [item for item in rows if isinstance(item, dict)]
+
+    def _query_candidate_rows(self, question: str, fetch_limit: int) -> Any:
+        tokens = [token for token in tokenize(question) if len(token) >= 4][:6]
+        query = self._client.table(self._table_name).select("*")
+        if tokens:
+            clauses = [f"content.ilike.%{token}%" for token in tokens]
+            query = query.or_(",".join(clauses))
+        return query.limit(fetch_limit).execute()
 
 
 def _load_seed_documents(path: str) -> list[dict[str, str]]:

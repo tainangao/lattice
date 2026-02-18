@@ -198,6 +198,22 @@ set -a && source .env && set +a
 uv run python scripts/ingestion/validate_phase2_data.py
 ```
 
+Integration test run (requires live Supabase and Neo4j env vars):
+
+```bash
+set -a && source .env && set +a
+uv run pytest -m integration
+```
+
+Note: the Supabase integration test currently enables `ALLOW_SERVICE_ROLE_FOR_RETRIEVAL=true` inside the test to validate retrieval deterministically before user-auth JWT wiring is complete.
+
+Integration tests added:
+
+- `tests/integration/test_supabase_retrieval.py`
+- `tests/integration/test_neo4j_retrieval.py`
+
+Note: Neo4j Aura can show short read-after-write lag across cluster members. The Neo4j integration test includes bounded retries to avoid flaky failures.
+
 Idempotency behavior:
 
 - Document ingestion uses deterministic `id` values and upserts on conflict.
