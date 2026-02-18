@@ -16,6 +16,14 @@
         "mcp-server-time"
       ],
       "enabled": true
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "ctx7sk-b2ccfe03-3632-4263-ad9f-a9704fc1056c"
+      },
+      "enabled": true
     }
   }
 }
