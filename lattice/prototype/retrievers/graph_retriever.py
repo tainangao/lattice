@@ -116,20 +116,24 @@ class Neo4jGraphRetriever:
             "WITH t, people, genres, "
             "toLower(coalesce(t.title, '')) AS title_lower, "
             "toLower(coalesce(t.type, '')) AS type_lower, "
+            "toLower(coalesce(t.description, '')) AS description_lower "
+            "WITH t, people, genres, type_lower, "
             "[token IN $tokens WHERE title_lower CONTAINS token] AS title_hits, "
+            "[token IN $tokens WHERE description_lower CONTAINS token] AS description_hits, "
             "[token IN $tokens WHERE any(name IN people WHERE toLower(name) CONTAINS token)] AS person_hits, "
             "[token IN $tokens WHERE any(name IN genres WHERE toLower(name) CONTAINS token)] AS genre_hits, "
             "[phrase IN $genre_phrases WHERE any(name IN genres WHERE toLower(name) CONTAINS phrase)] AS genre_phrase_hits "
-            "WITH t, type_lower, people, genres, title_hits, person_hits, genre_hits, genre_phrase_hits, "
+            "WITH t, type_lower, people, genres, title_hits, description_hits, person_hits, genre_hits, genre_phrase_hits, "
             "size(title_hits) AS title_score, "
+            "size(description_hits) AS description_score, "
             "size(person_hits) AS person_score, "
             "size(genre_hits) AS genre_score "
-            "WITH t, type_lower, people, genres, title_hits, person_hits, genre_hits, genre_phrase_hits, "
-            "title_score, person_score, genre_score, "
+            "WITH t, type_lower, people, genres, title_hits, description_hits, person_hits, genre_hits, genre_phrase_hits, "
+            "title_score, description_score, person_score, genre_score, "
             "size(genre_phrase_hits) AS genre_phrase_score, "
             "CASE WHEN $tv_signal AND type_lower = 'tv show' THEN 1 ELSE 0 END AS tv_bonus, "
             "CASE WHEN $movie_signal AND type_lower = 'movie' THEN 1 ELSE 0 END AS movie_bonus "
-            "WHERE title_score + person_score + genre_score + genre_phrase_score + tv_bonus + movie_bonus > 0 "
+            "WHERE title_score + description_score + person_score + genre_score + genre_phrase_score + tv_bonus + movie_bonus > 0 "
             "RETURN "
             "t.show_id AS show_id, "
             "t.title AS title, "
@@ -138,10 +142,11 @@ class Neo4jGraphRetriever:
             "people[0..5] AS people, "
             "genres[0..5] AS genres, "
             "title_hits AS title_hits, "
+            "description_hits AS description_hits, "
             "person_hits AS person_hits, "
             "genre_hits AS genre_hits, "
             "genre_phrase_hits AS genre_phrase_hits, "
-            "(title_score * 3.0 + person_score * 2.0 + genre_score * 2.0 + genre_phrase_score * 4.0 + tv_bonus * 1.0 + movie_bonus * 1.0) "
+            "(title_score * 3.0 + description_score * 1.0 + person_score * 2.0 + genre_score * 2.0 + genre_phrase_score * 4.0 + tv_bonus * 1.0 + movie_bonus * 1.0) "
             "/ toFloat($token_count) AS score "
             "ORDER BY score DESC, title_score DESC, person_score DESC, genre_score DESC "
             "LIMIT $limit"
@@ -244,6 +249,7 @@ def _record_to_result(record: Any) -> dict[str, Any]:
         "people": _coerce_str_list(record.get("people")),
         "genres": _coerce_str_list(record.get("genres")),
         "title_hits": _coerce_str_list(record.get("title_hits")),
+        "description_hits": _coerce_str_list(record.get("description_hits")),
         "person_hits": _coerce_str_list(record.get("person_hits")),
         "genre_hits": _coerce_str_list(record.get("genre_hits")),
         "genre_phrase_hits": _coerce_str_list(record.get("genre_phrase_hits")),
@@ -271,6 +277,7 @@ def _result_to_snippet(result: dict[str, Any]) -> SourceSnippet:
     people = ", ".join(result.get("people", [])) or "n/a"
     genres = ", ".join(result.get("genres", [])) or "n/a"
     title_hits = ", ".join(result.get("title_hits", [])) or "none"
+    description_hits = ", ".join(result.get("description_hits", [])) or "none"
     person_hits = ", ".join(result.get("person_hits", [])) or "none"
     genre_hits = ", ".join(result.get("genre_hits", [])) or "none"
     genre_phrase_hits = ", ".join(result.get("genre_phrase_hits", [])) or "none"
@@ -280,7 +287,7 @@ def _result_to_snippet(result: dict[str, Any]) -> SourceSnippet:
         source_id=f"Title:{source_id}",
         text=(
             f"{title} ({title_type}{year_text}) | genres: {genres} | people: {people}. "
-            f"Matched tokens -> title: {title_hits}; people: {person_hits}; genres: {genre_hits}; genre_phrases: {genre_phrase_hits}."
+            f"Matched tokens -> title: {title_hits}; description: {description_hits}; people: {person_hits}; genres: {genre_hits}; genre_phrases: {genre_phrase_hits}."
         ),
         score=min(max(_coerce_float(result.get("score")), 0.0), 1.0),
     )
