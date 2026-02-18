@@ -5,5 +5,19 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "chainlit>=2.9.2",
+    "fastapi>=0.118.0",
+    "google-genai>=1.33.0",
+    "grpcio==1.63.2",
+    "langgraph>=0.6.7",
     "neo4j-graphrag>=1.13.0",
+    "neo4j>=5.28.2",
+    "pydantic>=2.11.7",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "supabase>=2.23.2",
+    "uvicorn>=0.37.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
