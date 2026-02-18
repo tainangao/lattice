@@ -8,6 +8,14 @@
         "@playwright/mcp@latest"
       ],
       "enabled": true
+    },
+    "time": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "mcp-server-time"
+      ],
+      "enabled": true
     }
   }
 }
