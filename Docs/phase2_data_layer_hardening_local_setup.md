@@ -122,6 +122,18 @@ Expected response includes:
 - `answer` with a grounded response
 - `snippets` array with source entries
 
+8. Validate data-layer health endpoint:
+
+```bash
+curl -s http://127.0.0.1:8000/health/data
+```
+
+Expected response includes:
+
+- `retriever_mode` showing real-vs-seeded settings
+- `supabase.status` and `neo4j.status`
+- `ok` set based on readiness and fallback policy
+
 ## Notes for Supabase local-first
 
 - If you are running a local Supabase stack, set `SUPABASE_URL` to your local API URL.
@@ -173,6 +185,13 @@ uv run python scripts/ingestion/ingest_netflix_csv_neo4j.py
 Optional Cypher-only load script (requires CSV URL reachable by Neo4j):
 
 - `scripts/ingestion/neo4j_netflix_load.cypher`
+
+Post-ingestion data quality validation:
+
+```bash
+set -a && source .env && set +a
+uv run python scripts/ingestion/validate_phase2_data.py
+```
 
 Idempotency behavior:
 

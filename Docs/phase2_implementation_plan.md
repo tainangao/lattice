@@ -116,3 +116,30 @@ Include a known-good dataset run and expected output checks.
 ## Immediate Next Step
 
 Start with Steps 1-5 (retriever integration and tests), then proceed to Steps 6-7 (ingestion + validation runbook).
+
+## Current Status and Next Actions
+
+### Completed in current branch
+
+- Config toggles, real retrievers, service wiring, and fallback controls are implemented.
+- Ingestion scripts for Supabase and Neo4j are implemented.
+- Retrieval behavior is tuned for Netflix graph queries.
+
+### Next actions (Phase 2 hardening)
+
+1. **Data quality gates after ingestion**
+   - Add a validation command to check Supabase and Neo4j health plus basic quality signals.
+   - Checks include row/node counts, empty content rows, and duplicate source-chunk keys.
+
+2. **Operational fallback visibility**
+   - Add `/health/data` endpoint to report real/seeded mode, fallback policy, and data-source readiness.
+
+3. **RLS and key-path alignment**
+   - Keep service-role for ingestion paths.
+   - Move user-facing retrieval toward anon/authenticated flow with RLS-only access.
+
+4. **Retriever quality follow-up**
+   - Add stronger ranking/reranking for mixed graph queries and reduce irrelevant fallback snippets.
+
+5. **Integration test coverage**
+   - Add env-gated integration tests for Supabase and Neo4j retrieval with fallback disabled.
