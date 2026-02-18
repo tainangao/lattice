@@ -113,10 +113,10 @@ Chainlit provides native UI elements for agentic visibility.
 
 ### 1. File Ingestion (Private)
 
-* **Parser:** **LlamaParse** or **Unstructured.io** (optimized for complex layouts/tables) instead of simple PyPDF.
+* **Parser:** **PyMuPDF** for prototype-first simplicity and lower operational overhead; defer LlamaParse/Unstructured.io for a later phase if complex layout/table extraction becomes a requirement.
 * **Process:**
 1. User uploads file via Chainlit UI.
-2. File is parsed into markdown-formatted text.
+2. File is parsed into normalized text for chunking.
 3. Text is chunked (parent-child chunking) and embedded.
 4. stored in Supabase `embeddings` table with `user_id`.
 
