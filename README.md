@@ -16,7 +16,7 @@ This repository now contains a prototype-first Agentic Graph RAG demo.
 1. Install dependencies:
 
 ```bash
-pip install -e .
+uv sync
 ```
 
 2. Optional: copy env vars:
@@ -28,7 +28,7 @@ cp .env.example .env
 3. Run the app:
 
 ```bash
-uvicorn main:app --reload
+uv run uvicorn main:app --reload
 ```
 
 4. Open:
