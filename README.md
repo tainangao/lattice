@@ -39,3 +39,9 @@ uv run uvicorn main:app --reload
 ## Example query
 
 "How does the project timeline in my PDF compare to graph dependencies?"
+
+## Phase 2 setup
+
+For local-first Supabase + Neo4j bootstrap and verification, follow:
+
+- `Docs/phase2_data_layer_hardening_local_setup.md`

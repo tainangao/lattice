@@ -19,6 +19,30 @@ GRAPH_HINTS = {
     "owner",
     "hierarchy",
 }
+NETFLIX_GRAPH_HINTS = {
+    "title",
+    "titles",
+    "genre",
+    "genres",
+    "actor",
+    "actors",
+    "cast",
+    "director",
+    "directors",
+    "rating",
+    "ratings",
+    "thriller",
+    "thrillers",
+    "drama",
+    "dramas",
+    "comedy",
+    "comedies",
+    "movie",
+    "movies",
+    "show",
+    "shows",
+    "tv",
+}
 
 
 def route_question(question: str) -> RouteDecision:
@@ -28,7 +52,7 @@ def route_question(question: str) -> RouteDecision:
 
     tokens = set(re.findall(r"[a-zA-Z0-9_]+", normalized))
     wants_docs = bool(tokens.intersection(DOCUMENT_HINTS))
-    wants_graph = bool(tokens.intersection(GRAPH_HINTS))
+    wants_graph = bool(tokens.intersection(GRAPH_HINTS.union(NETFLIX_GRAPH_HINTS)))
 
     if wants_docs and wants_graph:
         return RouteDecision(

@@ -36,3 +36,6 @@ htmlcov/
 # Chainlit local artifacts
 .chainlit/cache/
 .chainlit/translations/
+
+# Local large datasets
+data/netflix_titles.csv
