@@ -11,12 +11,11 @@ This is a Python project using FastAPI, Pydantic, and Streamlit. The project fol
 ### Python Environment
 
 ```bash
-# Activate virtual environment
-source .venv/bin/activate
-
 # Install dependencies
-pip install -e .
-pip install fastapi pydantic streamlit pytest pytest-asyncio ruff black mypy
+uv sync
+
+# Optional: activate virtual environment for direct tool usage
+source .venv/bin/activate
 ```
 
 ### Running the Application

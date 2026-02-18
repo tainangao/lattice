@@ -19,8 +19,8 @@ Scope: Working Prototype (Result First)
 
 ## How to Run
 
-1. `pip install -e .`
-2. `uvicorn main:app --reload`
+1. `uv sync`
+2. `uv run uvicorn main:app --reload`
 3. Open `http://127.0.0.1:8000/chainlit`
 
 ## Prototype Success Signal
