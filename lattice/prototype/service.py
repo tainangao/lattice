@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from uuid import uuid4
 from typing import Protocol
 
 from lattice.prototype.config import AppConfig, select_supabase_retrieval_key
@@ -14,6 +15,10 @@ from lattice.prototype.models import (
 from lattice.prototype.orchestration import (
     build_orchestration_graph,
     create_initial_state,
+)
+from lattice.prototype.orchestration.telemetry import (
+    build_graph_invoke_config,
+    emit_orchestration_telemetry,
 )
 from lattice.prototype.retrievers.merge import rank_and_trim_snippets
 from lattice.prototype.retrievers.document_retriever import (
@@ -51,8 +56,13 @@ class PrototypeService:
         )
 
     async def run_query(self, question: str) -> QueryResponse:
-        state = create_initial_state(question)
-        result_state = await self._orchestration_graph.ainvoke(state)
+        request_id = uuid4().hex
+        state = create_initial_state(question, request_id=request_id)
+        result_state = await self._orchestration_graph.ainvoke(
+            state,
+            config=build_graph_invoke_config(request_id),
+        )
+        emit_orchestration_telemetry(result_state)
         route = _route_from_state(result_state)
         snippets = _snippets_from_state(result_state)
         answer = _answer_from_state(result_state, route.mode)

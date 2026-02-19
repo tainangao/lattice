@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from time import perf_counter
 from typing import Protocol
 
 from lattice.prototype.models import RetrievalMode
@@ -29,6 +30,7 @@ def router_node(state: OrchestrationState) -> OrchestrationState:
                 "event": "route_selected",
                 "mode": decision.mode.value,
                 "reason": decision.reason,
+                "question_length": len(question),
             }
         ],
     }
@@ -51,12 +53,21 @@ def graph_retrieval_node(state: OrchestrationState) -> OrchestrationState:
 
 
 def merge_node(state: OrchestrationState) -> OrchestrationState:
+    started = perf_counter()
     document_snippets = state.get("document_snippets", [])
     graph_snippets = state.get("graph_snippets", [])
     merged = rank_and_trim_snippets([*document_snippets, *graph_snippets])
     return {
         "snippets": merged,
-        "telemetry_events": [{"event": "fan_in_completed", "count": len(merged)}],
+        "telemetry_events": [
+            {
+                "event": "fan_in_completed",
+                "count": len(merged),
+                "document_count": len(document_snippets),
+                "graph_count": len(graph_snippets),
+                "duration_ms": _duration_ms(started),
+            }
+        ],
     }
 
 
@@ -109,6 +120,7 @@ def make_document_retrieval_node(
             return {"document_snippets": []}
 
         question = state.get("question", "")
+        started = perf_counter()
         snippets = await _run_retriever_with_fallback(
             question=question,
             primary_retriever=primary_retriever,
@@ -119,7 +131,11 @@ def make_document_retrieval_node(
         return {
             "document_snippets": snippets,
             "telemetry_events": [
-                {"event": "document_branch_completed", "count": len(snippets)}
+                {
+                    "event": "document_branch_completed",
+                    "count": len(snippets),
+                    "duration_ms": _duration_ms(started),
+                }
             ],
         }
 
@@ -137,6 +153,7 @@ def make_graph_retrieval_node(
             return {"graph_snippets": []}
 
         question = state.get("question", "")
+        started = perf_counter()
         snippets = await _run_retriever_with_fallback(
             question=question,
             primary_retriever=primary_retriever,
@@ -147,7 +164,11 @@ def make_graph_retrieval_node(
         return {
             "graph_snippets": snippets,
             "telemetry_events": [
-                {"event": "graph_branch_completed", "count": len(snippets)}
+                {
+                    "event": "graph_branch_completed",
+                    "count": len(snippets),
+                    "duration_ms": _duration_ms(started),
+                }
             ],
         }
 
@@ -166,6 +187,7 @@ def make_synthesize_node(gemini_api_key: str | None):
             }
 
         snippets = state.get("snippets", [])
+        started = perf_counter()
         answer = await synthesize_answer(
             question=state.get("question", ""),
             snippets=snippets,
@@ -173,7 +195,13 @@ def make_synthesize_node(gemini_api_key: str | None):
         )
         return {
             "answer": answer,
-            "telemetry_events": [{"event": "synthesis_completed", "mode": "retrieval"}],
+            "telemetry_events": [
+                {
+                    "event": "synthesis_completed",
+                    "mode": "retrieval",
+                    "duration_ms": _duration_ms(started),
+                }
+            ],
         }
 
     return _node
@@ -215,3 +243,7 @@ def _build_retriever_error_snippet(
         ),
         score=0.0,
     )
+
+
+def _duration_ms(started: float) -> int:
+    return int((perf_counter() - started) * 1000)

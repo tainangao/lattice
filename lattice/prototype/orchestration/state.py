@@ -7,6 +7,7 @@ from lattice.prototype.models import RetrievalMode, SourceSnippet
 
 
 class OrchestrationState(TypedDict, total=False):
+    request_id: str
     question: str
     route_mode: RetrievalMode | None
     route_reason: str | None
@@ -18,8 +19,12 @@ class OrchestrationState(TypedDict, total=False):
     errors: Annotated[list[str], operator.add]
 
 
-def create_initial_state(question: str) -> OrchestrationState:
+def create_initial_state(
+    question: str,
+    request_id: str = "unknown",
+) -> OrchestrationState:
     return {
+        "request_id": request_id,
         "question": question,
         "route_mode": None,
         "route_reason": None,
