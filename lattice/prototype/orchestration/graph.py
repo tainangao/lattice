@@ -6,9 +6,9 @@ from lattice.prototype.models import RetrievalMode
 from lattice.prototype.orchestration.nodes import Retriever
 
 from .nodes import (
-    finalize_node,
     make_critic_node,
     make_document_retrieval_node,
+    make_finalize_node,
     make_graph_retrieval_node,
     make_refinement_node,
     make_synthesize_node,
@@ -51,6 +51,7 @@ def build_orchestration_graph(
         enable_critic=phase4_enable_critic,
     )
     refinement_node = make_refinement_node(phase4_refinement_retrieval_limit)
+    finalize_node = make_finalize_node(phase4_confidence_threshold)
 
     graph_builder.add_node("router", router_node)
     graph_builder.add_node("document_retrieval", document_node)

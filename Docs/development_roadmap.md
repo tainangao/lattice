@@ -94,6 +94,11 @@ This roadmap is organized to deliver visible user results early, then incrementa
 * Response contract remains unchanged for `/api/prototype/query`.
 * Regression tests stay green.
 
+* **Progress update (2026-02-19):**
+* Increment 1 is implemented (critic scoring + bounded refinement loop + tests).
+* Increment 2 is implemented (grounded-answer enforcement, low-confidence policy tiers, and quality summary telemetry fields including confidence bucket and refinement trigger rate).
+* Next focus: calibrate confidence thresholds against production telemetry and finalize Phase 4 close criteria.
+
 ### Phase 5: Frontend, Security, and Production
 
 **Goal:** Ship a secure, user-friendly product for real usage.

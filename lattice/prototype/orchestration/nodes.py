@@ -101,20 +101,58 @@ def synthesize_node(state: OrchestrationState) -> OrchestrationState:
     }
 
 
-def finalize_node(state: OrchestrationState) -> OrchestrationState:
-    return {
-        "telemetry_events": [
-            {
-                "event": "orchestration_completed",
-                "mode": (
-                    state.get("route_mode").value
-                    if state.get("route_mode") is not None
-                    else None
-                ),
-                "snippet_count": len(state.get("snippets", [])),
+def make_finalize_node(confidence_threshold: float):
+    def _node(state: OrchestrationState) -> OrchestrationState:
+        route_mode = state.get("route_mode")
+        if route_mode == RetrievalMode.DIRECT:
+            return {
+                "telemetry_events": [
+                    {
+                        "event": "orchestration_completed",
+                        "mode": "direct",
+                        "snippet_count": 0,
+                    }
+                ]
             }
-        ]
-    }
+
+        confidence = _resolve_confidence(state)
+        tier = _confidence_tier(confidence, confidence_threshold)
+        refinement_attempt = state.get("refinement_attempt", 0)
+        reason_codes = state.get("critic_reason_codes", [])
+        answer = state.get("answer", "") or ""
+
+        updated_answer = answer
+        if tier == "low":
+            updated_answer = _build_low_confidence_answer(state.get("snippets", []))
+        elif tier == "medium":
+            updated_answer = _append_moderate_confidence_note(answer)
+
+        critic_events = _count_events(state, "critic_completed")
+        refinement_events = _count_events(state, "refinement_started")
+        refinement_trigger_rate = (
+            refinement_events / critic_events if critic_events > 0 else 0.0
+        )
+        return {
+            "answer": updated_answer,
+            "telemetry_events": [
+                {
+                    "event": "quality_summary",
+                    "confidence": confidence,
+                    "confidence_bucket": tier,
+                    "reason_codes": reason_codes,
+                    "refinement_attempt": refinement_attempt,
+                    "refinement_trigger_rate": round(refinement_trigger_rate, 4),
+                },
+                {
+                    "event": "orchestration_completed",
+                    "mode": route_mode.value if route_mode is not None else None,
+                    "snippet_count": len(state.get("snippets", [])),
+                    "confidence_bucket": tier,
+                },
+            ],
+        }
+
+    return _node
 
 
 def make_document_retrieval_node(
@@ -371,3 +409,54 @@ def _resolve_retrieval_limit(state: OrchestrationState) -> int:
     if isinstance(value, int) and value > 0:
         return value
     return 3
+
+
+def _resolve_confidence(state: OrchestrationState) -> float:
+    value = state.get("critic_confidence")
+    if isinstance(value, (float, int)):
+        return float(value)
+    return 0.0
+
+
+def _confidence_tier(confidence: float, threshold: float) -> str:
+    medium_threshold = threshold * 0.8
+    if confidence >= threshold:
+        return "high"
+    if confidence >= medium_threshold:
+        return "medium"
+    return "low"
+
+
+def _build_low_confidence_answer(snippets: list[SourceSnippet]) -> str:
+    if not snippets:
+        return (
+            "I do not have enough high-confidence evidence to answer reliably yet. "
+            "Please provide more specific context or upload additional supporting data."
+        )
+    citations = ", ".join(f"{item.source_type}:{item.source_id}" for item in snippets)
+    return (
+        "I found related context, but confidence is still low after refinement. "
+        "Treat this as preliminary and verify with the cited sources.\n"
+        f"Sources: {citations}"
+    )
+
+
+def _append_moderate_confidence_note(answer: str) -> str:
+    note = "Confidence note: evidence quality is moderate; verify key claims against cited sources."
+    stripped = answer.strip()
+    if not stripped:
+        return note
+    if note in stripped:
+        return stripped
+    return f"{stripped}\n\n{note}"
+
+
+def _count_events(state: OrchestrationState, event_name: str) -> int:
+    events = state.get("telemetry_events", [])
+    if not isinstance(events, list):
+        return 0
+    return sum(
+        1
+        for event in events
+        if isinstance(event, dict) and event.get("event") == event_name
+    )

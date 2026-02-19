@@ -274,3 +274,68 @@ async def test_orchestration_graph_critic_refines_once_then_finalizes() -> None:
     assert result.get("critic_needs_refinement") is False
     assert result.get("refinement_attempt") == 1
     assert _event(result, "refinement_started")
+
+
+@pytest.mark.asyncio
+async def test_orchestration_graph_low_confidence_policy_returns_safe_answer() -> None:
+    weak_document = _FakeRetriever(
+        [
+            SourceSnippet(
+                source_type="document",
+                source_id="doc#weak",
+                text="Weak support snippet.",
+                score=0.1,
+            )
+        ]
+    )
+    empty_graph = _FakeRetriever([])
+    orchestration = build_orchestration_graph(
+        document_retriever=weak_document,
+        graph_retriever=empty_graph,
+        seed_document_retriever=weak_document,
+        seed_graph_retriever=empty_graph,
+        allow_seeded_fallback=True,
+        gemini_api_key=None,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.8,
+        phase4_min_snippets=3,
+        phase4_max_refinement_rounds=0,
+        phase4_refinement_retrieval_limit=5,
+    )
+
+    result = await orchestration.ainvoke(
+        create_initial_state("Summarize weak evidence."),
+    )
+
+    answer = result.get("answer", "")
+    assert isinstance(answer, str)
+    assert "confidence is still low" in answer.lower()
+    quality_event = _event(result, "quality_summary")
+    assert quality_event.get("confidence_bucket") == "low"
+
+
+@pytest.mark.asyncio
+async def test_orchestration_graph_quality_summary_reports_refinement_rate() -> None:
+    adaptive = _AdaptiveRetriever()
+    empty_graph = _FakeRetriever([])
+    orchestration = build_orchestration_graph(
+        document_retriever=adaptive,
+        graph_retriever=empty_graph,
+        seed_document_retriever=adaptive,
+        seed_graph_retriever=empty_graph,
+        allow_seeded_fallback=True,
+        gemini_api_key=None,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.62,
+        phase4_min_snippets=2,
+        phase4_max_refinement_rounds=1,
+        phase4_refinement_retrieval_limit=5,
+    )
+
+    result = await orchestration.ainvoke(
+        create_initial_state("Check refinement telemetry."),
+    )
+
+    quality_event = _event(result, "quality_summary")
+    assert quality_event.get("confidence_bucket") == "high"
+    assert quality_event.get("refinement_trigger_rate") == 0.5
