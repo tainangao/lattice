@@ -184,3 +184,26 @@ This roadmap is organized to deliver visible user results early, then incrementa
    - `neo4j-graphrag` adoption remains deferred until provider/runtime prerequisites are stable.
 4. **Quality Layer Active:** Critic and feedback loops in production logic.
 5. **Production Launch:** Hardened UX, security, and deployment.
+
+## Phase 5 Close-Out Note (Increment 1)
+
+**Date:** 2026-02-19  
+**Status:** Closed for increment 1 scope
+
+### What shipped
+
+- Hugging Face Docker deployment baseline is stable with `app_port: 7860`, root landing behavior, and one-command deploy flow via `./scripts/deploy_hf.sh`.
+- Production configuration uses Space Secrets/Variables (no repo-committed credentials), with runbook guidance and post-deploy checks.
+- Stateless key handling is active across surfaces:
+  - API request-scoped override via `X-Gemini-Api-Key`.
+  - Chainlit session-scoped key controls via `/setkey`, `/clearkey`, and `/help`.
+- Chainlit cold-start onboarding includes public demo quota controls and key escalation guidance.
+- Operational endpoints include `GET /health` (liveness), `GET /ready` (connector-aware readiness), and `GET /health/data` (connector diagnostics).
+- `/api/prototype/query` contract remains stable while fallback behavior is preserved when keys/connectors are unavailable.
+- Targeted tests for onboarding quota flow and readiness behavior are passing.
+
+### Follow-up hardening (post-close)
+
+- Finalize and record Supabase RLS verification evidence per environment.
+- Add lightweight operational thresholds/alerting tied to readiness and error telemetry.
+- Continue onboarding/response UX copy polish based on production session feedback.
