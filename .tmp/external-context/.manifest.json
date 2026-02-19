@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_updated": "2026-02-18",
+  "last_updated": "2026-02-19",
   "libraries": {
     "fastapi": {
       "files": [
@@ -59,6 +59,18 @@
           "fetched": "2026-02-18",
           "source": "PyPI JSON API",
           "path": ".tmp/external-context/grpcio/macos-cp311-wheel-versions-and-opentelemetry-compat.md"
+        }
+      ]
+    },
+    "neo4j-graphrag": {
+      "files": [
+        {
+          "filename": "phase3-hybrid-retrieval-driver-integration.md",
+          "topic": "HybridRetriever + vector/graph traversal patterns + retrieval depth + driver integration",
+          "tech_stack": "Python + Neo4j GraphRAG + Neo4j Python Driver",
+          "fetched": "2026-02-19",
+          "source": "Context7 API",
+          "path": ".tmp/external-context/neo4j-graphrag/phase3-hybrid-retrieval-driver-integration.md"
         }
       ]
     }
