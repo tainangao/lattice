@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from lattice.prototype.config import load_config, with_runtime_gemini_key
 from lattice.prototype.data_health import build_data_health_report
 from lattice.prototype.models import QueryRequest
+from lattice.prototype.readiness import build_readiness_report
 from lattice.prototype.service import PrototypeService
 
 app = FastAPI(title="Lattice Phase 1 Prototype", version="0.1.0")
@@ -22,6 +23,13 @@ async def root() -> RedirectResponse:
 @app.get("/health")
 async def health() -> dict[str, bool]:
     return {"ok": True}
+
+
+@app.get("/ready")
+async def readiness() -> JSONResponse:
+    report = build_readiness_report(load_config())
+    status_code = 200 if bool(report.get("ready")) else 503
+    return JSONResponse(content=report, status_code=status_code)
 
 
 @app.get("/health/data")

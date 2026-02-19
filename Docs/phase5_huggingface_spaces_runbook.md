@@ -63,9 +63,10 @@ After push, Space rebuild starts automatically.
 
 1. Space build is `Running` (no Docker build errors)
 2. `GET /health` returns `{"ok": true}`
-3. `GET /health/data` returns 200 or expected connector diagnostics
-4. `POST /api/prototype/query` returns answer + snippets
-5. Chainlit route `/chainlit` loads and answers sample question
+3. `GET /ready` returns connector-aware readiness details (200 when ready, 503 when misconfigured without fallback)
+4. `GET /health/data` returns 200 or expected connector diagnostics
+5. `POST /api/prototype/query` returns answer + snippets
+6. Chainlit route `/chainlit` loads and answers sample question
 
 ## 6) Runtime key handling
 

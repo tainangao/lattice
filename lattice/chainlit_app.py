@@ -126,7 +126,7 @@ def _build_welcome_message(demo_limit: int) -> str:
         "- Ask questions about project timelines, dependencies, and ownership links.\n"
         "- Public demo mode includes a limited number of queries per chat session.\n"
         f"- Remaining in this session: {demo_limit}.\n"
-        "- Use `/setkey <gemini-key>` for your own key, `/clearkey` to remove it, and `/help` for commands."
+        "- Use `/setkey <gemini-key>` to continue beyond quota, `/clearkey` to remove it, and `/help` for commands."
     )
 
 
@@ -148,5 +148,5 @@ def _quota_exhausted_message(demo_limit: int) -> str:
 
 def _build_demo_footer(has_session_key: bool, remaining: int) -> str:
     if has_session_key:
-        return "\n\nSession key mode: active."
+        return "\n\nSession key mode: active (public demo quota not applied)."
     return f"\n\nPublic demo queries remaining in this session: {remaining}."

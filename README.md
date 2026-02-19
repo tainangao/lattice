@@ -17,6 +17,7 @@ This repository contains a prototype-first Agentic Graph RAG app with LangGraph 
 ## Implemented
 
 - FastAPI app with `GET /health` and `POST /api/prototype/query`
+- FastAPI readiness endpoint `GET /ready` for connector-aware startup checks
 - Chainlit interface mounted at `/chainlit`
 - Router agent (direct vs doc vs graph vs both)
 - Fan-out retrieval over seeded document and graph datasets
@@ -48,6 +49,7 @@ uv run uvicorn main:app --reload
 4. Open:
 
 - API docs: `http://127.0.0.1:8000/docs`
+- Readiness: `http://127.0.0.1:8000/ready`
 - Chainlit UI: `http://127.0.0.1:8000/chainlit`
 
 ## Session key override (Chainlit)

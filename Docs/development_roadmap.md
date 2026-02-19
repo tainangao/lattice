@@ -66,6 +66,19 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 * **Progress audit (2026-02-19, updated):**
 * **Done:**
+  * Step A complete: Hugging Face Docker Space baseline is live (`app_port: 7860`, timeout configured).
+  * Step B complete: runtime secrets/variables are env-driven and documented.
+  * Step C complete: request-scoped API key override (`X-Gemini-Api-Key`) and session-scoped Chainlit key override (`/setkey`) are active.
+  * Step D complete: operational runbook includes secrets, variables, health checks, and deploy workflow (`./scripts/deploy_hf.sh`).
+  * Onboarding increment complete: Chainlit now has public demo quota controls and key lifecycle commands (`/help`, `/setkey`, `/clearkey`).
+* **Not done yet:**
+  * Security hardening follow-up: explicit Supabase RLS verification checklist and evidence capture per environment.
+  * Monitoring hardening: consolidate health/readiness + telemetry into an operator-facing checklist/dashboard.
+  * UX polish pass: refine onboarding copy and empty/low-confidence guidance based on real session feedback.
+  * Final Phase 5 close criteria and sign-off checklist are still open.
+
+* **Progress audit (2026-02-19, updated):**
+* **Done:**
   * Step A complete: Dockerized Space baseline is live (`app_port: 7860`, startup timeout configured).
   * Step B complete: runtime secrets/variables are documented and consumed via env-based config.
   * Step C complete: API supports request-scoped `X-Gemini-Api-Key`; Chainlit supports session-scoped `/setkey`.
@@ -152,6 +165,16 @@ This roadmap is organized to deliver visible user results early, then incrementa
 * **Current build focus (started 2026-02-19):**
 * Add cold-start UX controls in Chainlit (public demo quota, clear key lifecycle commands, and user-visible quota feedback).
 * Keep API contract unchanged while improving frontend onboarding behavior.
+* Add lightweight `/ready` endpoint for connector-aware startup/readiness signals.
+
+* **Phase 5 closure checklist (draft):**
+* [x] Docker Space deploy path stable with documented one-command flow.
+* [x] Runtime secret model uses Space settings only (no committed credentials).
+* [x] Stateless runtime key handling for API and Chainlit sessions.
+* [x] Public demo cold-start controls implemented and validated in HF runtime.
+* [ ] Supabase RLS verification checklist finalized and executed.
+* [ ] Monitoring/runbook updated with `/ready` and operational thresholds.
+* [ ] Final regression pass (full suite) recorded with release notes.
 
 ## Milestone Summary
 
