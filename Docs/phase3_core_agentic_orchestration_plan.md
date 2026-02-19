@@ -28,7 +28,7 @@ Scope: Introduce LangGraph fan-out/fan-in orchestration, stronger routing, and t
 ### Partially completed
 
 - Router improvements are in progress: tie-break behavior is improved and covered by orchestration routing tests, but rule sophistication is still heuristic and should be refined with production telemetry.
-- Telemetry foundation is complete, but deeper observability integration (for example LangSmith dashboards/queries) is still pending.
+- Telemetry foundation plus Step F dimensions are implemented (fallback-used flag, branch error class, retriever mode). Remaining work is deeper observability integration (for example LangSmith dashboards/queries).
 
 ### Not completed yet
 
@@ -192,5 +192,5 @@ Complete the remaining Phase 3 gaps in this order:
 ## Execution plan (next)
 
 - [x] **Step E:** Improve router tie-break logic (reduce ambiguous defaults while preserving compatibility).
-- [ ] **Step F:** Add richer telemetry dimensions (fallback-used flag, branch error class, retriever mode) for operational triage.
+- [x] **Step F:** Add richer telemetry dimensions (fallback-used flag, branch error class, retriever mode) for operational triage.
 - [ ] **Step G:** Run a GraphRAG migration spike behind config flags (`HybridRetriever` / `HybridCypherRetriever`) with regression comparison.

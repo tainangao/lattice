@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from time import perf_counter
-from typing import Protocol
+from typing import Protocol, TypedDict
 
 from lattice.prototype.models import RetrievalMode
 from lattice.prototype.models import SourceSnippet
@@ -17,6 +17,13 @@ LOGGER = logging.getLogger(__name__)
 
 class Retriever(Protocol):
     async def retrieve(self, question: str, limit: int = 3) -> list[SourceSnippet]: ...
+
+
+class RetrieverOutcome(TypedDict):
+    snippets: list[SourceSnippet]
+    fallback_used: bool
+    error_class: str | None
+    retriever_mode: str
 
 
 def router_node(state: OrchestrationState) -> OrchestrationState:
@@ -121,7 +128,7 @@ def make_document_retrieval_node(
 
         question = state.get("question", "")
         started = perf_counter()
-        snippets = await _run_retriever_with_fallback(
+        outcome = await _run_retriever_with_fallback(
             question=question,
             primary_retriever=primary_retriever,
             fallback_retriever=fallback_retriever,
@@ -129,11 +136,14 @@ def make_document_retrieval_node(
             retriever_name="document",
         )
         return {
-            "document_snippets": snippets,
+            "document_snippets": outcome["snippets"],
             "telemetry_events": [
                 {
                     "event": "document_branch_completed",
-                    "count": len(snippets),
+                    "count": len(outcome["snippets"]),
+                    "fallback_used": outcome["fallback_used"],
+                    "error_class": outcome["error_class"],
+                    "retriever_mode": outcome["retriever_mode"],
                     "duration_ms": _duration_ms(started),
                 }
             ],
@@ -154,7 +164,7 @@ def make_graph_retrieval_node(
 
         question = state.get("question", "")
         started = perf_counter()
-        snippets = await _run_retriever_with_fallback(
+        outcome = await _run_retriever_with_fallback(
             question=question,
             primary_retriever=primary_retriever,
             fallback_retriever=fallback_retriever,
@@ -162,11 +172,14 @@ def make_graph_retrieval_node(
             retriever_name="graph",
         )
         return {
-            "graph_snippets": snippets,
+            "graph_snippets": outcome["snippets"],
             "telemetry_events": [
                 {
                     "event": "graph_branch_completed",
-                    "count": len(snippets),
+                    "count": len(outcome["snippets"]),
+                    "fallback_used": outcome["fallback_used"],
+                    "error_class": outcome["error_class"],
+                    "retriever_mode": outcome["retriever_mode"],
                     "duration_ms": _duration_ms(started),
                 }
             ],
@@ -213,21 +226,45 @@ async def _run_retriever_with_fallback(
     fallback_retriever: Retriever,
     allow_seeded_fallback: bool,
     retriever_name: str,
-) -> list[SourceSnippet]:
+) -> RetrieverOutcome:
     if primary_retriever is None:
-        return await fallback_retriever.retrieve(question)
+        snippets = await fallback_retriever.retrieve(question)
+        return {
+            "snippets": snippets,
+            "fallback_used": False,
+            "error_class": None,
+            "retriever_mode": "seeded_only",
+        }
 
     try:
-        return await primary_retriever.retrieve(question)
+        snippets = await primary_retriever.retrieve(question)
+        return {
+            "snippets": snippets,
+            "fallback_used": False,
+            "error_class": None,
+            "retriever_mode": "real",
+        }
     except Exception as exc:  # noqa: BLE001
         LOGGER.warning(
             "Primary retriever failed",
             extra={"retriever": retriever_name},
             exc_info=exc,
         )
+        error_class = exc.__class__.__name__
         if allow_seeded_fallback:
-            return await fallback_retriever.retrieve(question)
-        return [_build_retriever_error_snippet(retriever_name, exc)]
+            snippets = await fallback_retriever.retrieve(question)
+            return {
+                "snippets": snippets,
+                "fallback_used": True,
+                "error_class": error_class,
+                "retriever_mode": "seeded_fallback",
+            }
+        return {
+            "snippets": [_build_retriever_error_snippet(retriever_name, exc)],
+            "fallback_used": False,
+            "error_class": error_class,
+            "retriever_mode": "error_no_fallback",
+        }
 
 
 def _build_retriever_error_snippet(

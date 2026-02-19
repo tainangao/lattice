@@ -84,6 +84,12 @@ async def test_orchestration_graph_both_path_runs_fan_in() -> None:
         event.get("event") == "fan_in_completed"
         for event in result.get("telemetry_events", [])
     )
+    document_event = _event(result, "document_branch_completed")
+    graph_event = _event(result, "graph_branch_completed")
+    assert document_event.get("retriever_mode") == "real"
+    assert graph_event.get("retriever_mode") == "real"
+    assert document_event.get("fallback_used") is False
+    assert graph_event.get("fallback_used") is False
 
 
 @pytest.mark.asyncio
@@ -125,6 +131,10 @@ async def test_orchestration_graph_branch_failure_uses_seeded_fallback() -> None
     source_ids = {_source_id(snippet) for snippet in result["snippets"]}
     assert "doc#1" in source_ids
     assert "fallback-graph#1" in source_ids
+    graph_event = _event(result, "graph_branch_completed")
+    assert graph_event.get("retriever_mode") == "seeded_fallback"
+    assert graph_event.get("fallback_used") is True
+    assert graph_event.get("error_class") == "RuntimeError"
 
 
 @pytest.mark.asyncio
@@ -158,6 +168,10 @@ async def test_orchestration_graph_branch_failure_without_fallback_keeps_other_b
 
     assert len(result["snippets"]) == 1
     assert _source_id(result["snippets"][0]) == "doc#1"
+    graph_event = _event(result, "graph_branch_completed")
+    assert graph_event.get("retriever_mode") == "error_no_fallback"
+    assert graph_event.get("fallback_used") is False
+    assert graph_event.get("error_class") == "RuntimeError"
 
 
 def _source_id(snippet: object) -> str:
@@ -170,3 +184,13 @@ def _source_id(snippet: object) -> str:
     if isinstance(source_id, str):
         return source_id
     return ""
+
+
+def _event(result: dict[str, object], event_name: str) -> dict[str, object]:
+    events = result.get("telemetry_events")
+    if not isinstance(events, list):
+        return {}
+    for event in events:
+        if isinstance(event, dict) and event.get("event") == event_name:
+            return event
+    return {}

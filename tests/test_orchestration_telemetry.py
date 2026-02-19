@@ -23,9 +23,11 @@ def test_emit_orchestration_telemetry_logs_structured_events(
         "snippets": [{"source_type": "document", "source_id": "doc#1"}],
         "telemetry_events": [
             {
-                "event": "route_selected",
-                "mode": "both",
-                "reason": "mixed-intent",
+                "event": "graph_branch_completed",
+                "count": 1,
+                "fallback_used": True,
+                "error_class": "RuntimeError",
+                "retriever_mode": "seeded_fallback",
             }
         ],
     }
@@ -36,3 +38,10 @@ def test_emit_orchestration_telemetry_logs_structured_events(
 
     assert any("orchestration_event" in message for message in caplog.messages)
     assert any('"request_id": "req-123"' in message for message in caplog.messages)
+    assert any('"fallback_used": true' in message for message in caplog.messages)
+    assert any(
+        '"error_class": "RuntimeError"' in message for message in caplog.messages
+    )
+    assert any(
+        '"retriever_mode": "seeded_fallback"' in message for message in caplog.messages
+    )
