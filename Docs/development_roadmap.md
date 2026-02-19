@@ -62,6 +62,13 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 **Goal:** Improve trustworthiness and reasoning quality (Agent-G features).
 
+**Status (2026-02-19):** In progress.
+
+* **Execution strategy (quality vs speed):**
+* Ship a pragmatic single-pass critic + one bounded refinement loop first, behind config defaults.
+* Keep all behavior additive and non-breaking to preserve Phase 3 API contract and velocity.
+* Defer heavyweight multi-agent critic chains until baseline quality telemetry is stable.
+
 * **Critic Module:**
 * Score relevance and confidence of graph and document evidence.
 * Flag weak retrieval sets before final generation.
@@ -72,6 +79,20 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 * **Synthesis Quality:**
 * Enforce grounded responses with clear source citations.
+
+* **Phase 4 implementation plan (current):**
+* **Step A (core critic):** Add deterministic critic scoring in orchestration using snippet count, score quality, source diversity, and citation signal checks.
+* **Step B (bounded feedback loop):** Add at most one configurable refinement round that increases retrieval depth/limit and re-runs fan-out/fan-in.
+* **Step C (guardrails):** Add safeguards for runaway retries (`max_refinement_rounds`), direct-route bypass, and telemetry visibility of critic outcomes.
+* **Step D (tests):** Add orchestration tests for low-confidence refinement, no-refinement direct path, and bounded retry behavior.
+* **Step E (evaluation):** Compare pre/post confidence and latency from telemetry before considering richer iterative loops.
+
+* **Phase 4 acceptance criteria (increment 1):**
+* Critic emits confidence + reason codes per request.
+* Low-confidence retrieval can trigger one controlled refinement loop.
+* Loop terminates deterministically with no infinite retries.
+* Response contract remains unchanged for `/api/prototype/query`.
+* Regression tests stay green.
 
 ### Phase 5: Frontend, Security, and Production
 
