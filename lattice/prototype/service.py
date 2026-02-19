@@ -5,11 +5,17 @@ import logging
 from typing import Protocol
 
 from lattice.prototype.config import AppConfig, select_supabase_retrieval_key
-from lattice.prototype.models import QueryResponse, RetrievalMode, SourceSnippet
+from lattice.prototype.models import (
+    QueryResponse,
+    RetrievalMode,
+    RouteDecision,
+    SourceSnippet,
+)
 from lattice.prototype.orchestration import (
     build_orchestration_graph,
     create_initial_state,
 )
+from lattice.prototype.retrievers.merge import rank_and_trim_snippets
 from lattice.prototype.retrievers.document_retriever import (
     SeedDocumentRetriever,
     SupabaseDocumentRetriever,
@@ -18,8 +24,6 @@ from lattice.prototype.retrievers.graph_retriever import (
     Neo4jGraphRetriever,
     SeedGraphRetriever,
 )
-from lattice.prototype.router_agent import route_question
-from lattice.prototype.synthesizer import synthesize_answer
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,32 +41,21 @@ class PrototypeService:
         self._seed_graph_retriever = SeedGraphRetriever(config.prototype_graph_path)
         self._document_retriever = _build_document_retriever(config)
         self._graph_retriever = _build_graph_retriever(config)
-        self._orchestration_graph = build_orchestration_graph()
-
-    async def run_query(self, question: str) -> QueryResponse:
-        route = route_question(question)
-        if route.mode == RetrievalMode.DIRECT:
-            state = create_initial_state(question)
-            result_state = self._orchestration_graph.invoke(state)
-            return QueryResponse(
-                question=question,
-                route=route,
-                answer=_direct_answer_from_state(result_state),
-                snippets=result_state.get("snippets", []),
-            )
-
-        snippets = await _retrieve_snippets(
-            mode=route.mode,
-            question=question,
+        self._orchestration_graph = build_orchestration_graph(
             document_retriever=self._document_retriever,
             graph_retriever=self._graph_retriever,
             seed_document_retriever=self._seed_document_retriever,
             seed_graph_retriever=self._seed_graph_retriever,
-            allow_seeded_fallback=self._config.allow_seeded_fallback,
+            allow_seeded_fallback=config.allow_seeded_fallback,
+            gemini_api_key=config.gemini_api_key,
         )
-        answer = await synthesize_answer(
-            question, snippets, self._config.gemini_api_key
-        )
+
+    async def run_query(self, question: str) -> QueryResponse:
+        state = create_initial_state(question)
+        result_state = await self._orchestration_graph.ainvoke(state)
+        route = _route_from_state(result_state)
+        snippets = _snippets_from_state(result_state)
+        answer = _answer_from_state(result_state, route.mode)
         return QueryResponse(
             question=question, route=route, answer=answer, snippets=snippets
         )
@@ -109,7 +102,7 @@ async def _retrieve_snippets(
         retriever_name="graph",
     )
     document_results, graph_results = await asyncio.gather(document_task, graph_task)
-    return _rank_and_trim_snippets([*document_results, *graph_results])
+    return rank_and_trim_snippets([*document_results, *graph_results])
 
 
 async def _run_retriever_with_fallback(
@@ -150,44 +143,47 @@ def _build_retriever_error_snippet(
     )
 
 
-def _rank_and_trim_snippets(
-    snippets: list[SourceSnippet],
-    max_results: int = 5,
-) -> list[SourceSnippet]:
-    if not snippets:
-        return []
-
-    retrieval_snippets = [
-        snippet for snippet in snippets if snippet.source_type != "system"
-    ]
-    if not retrieval_snippets:
-        return snippets[:max_results]
-
-    top_score = max(snippet.score for snippet in retrieval_snippets)
-    min_score = max(0.12, top_score * 0.4)
-    filtered = [snippet for snippet in retrieval_snippets if snippet.score >= min_score]
-    ranked = filtered if filtered else retrieval_snippets[:1]
-    ranked = sorted(ranked, key=lambda snippet: snippet.score, reverse=True)
-    return _dedupe_snippets(ranked)[:max_results]
-
-
-def _dedupe_snippets(snippets: list[SourceSnippet]) -> list[SourceSnippet]:
-    seen: set[str] = set()
-    unique_snippets: list[SourceSnippet] = []
-    for snippet in snippets:
-        dedupe_key = f"{snippet.source_type}:{snippet.source_id}"
-        if dedupe_key in seen:
-            continue
-        seen.add(dedupe_key)
-        unique_snippets.append(snippet)
-    return unique_snippets
-
-
-def _direct_answer_from_state(state: dict[str, object]) -> str:
+def _answer_from_state(state: dict[str, object], mode: RetrievalMode) -> str:
     answer = state.get("answer")
     if isinstance(answer, str) and answer.strip():
         return answer
-    return "Hello! Ask me about project timelines, dependencies, or document context."
+    if mode == RetrievalMode.DIRECT:
+        return (
+            "Hello! Ask me about project timelines, dependencies, or document context."
+        )
+    return (
+        "I could not find matching prototype context yet. "
+        "Try asking about project timelines, dependencies, or ownership links."
+    )
+
+
+def _snippets_from_state(state: dict[str, object]) -> list[SourceSnippet]:
+    snippets = state.get("snippets")
+    if isinstance(snippets, list):
+        resolved: list[SourceSnippet] = []
+        for snippet in snippets:
+            if isinstance(snippet, SourceSnippet):
+                resolved.append(snippet)
+            elif isinstance(snippet, dict):
+                resolved.append(SourceSnippet.model_validate(snippet))
+        return resolved
+    return []
+
+
+def _route_from_state(state: dict[str, object]) -> RouteDecision:
+    mode = state.get("route_mode")
+    reason = state.get("route_reason")
+    if isinstance(mode, RetrievalMode):
+        resolved_mode = mode
+    elif isinstance(mode, str) and mode in {item.value for item in RetrievalMode}:
+        resolved_mode = RetrievalMode(mode)
+    else:
+        resolved_mode = RetrievalMode.DIRECT
+    if isinstance(reason, str) and reason.strip():
+        resolved_reason = reason
+    else:
+        resolved_reason = "Routing fallback: defaulted to direct mode."
+    return RouteDecision(mode=resolved_mode, reason=resolved_reason)
 
 
 def _build_document_retriever(config: AppConfig) -> Retriever | None:

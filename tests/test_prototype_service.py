@@ -2,11 +2,8 @@ import pytest
 
 from lattice.prototype.config import AppConfig
 from lattice.prototype.models import RetrievalMode, SourceSnippet
-from lattice.prototype.service import (
-    PrototypeService,
-    _rank_and_trim_snippets,
-    _run_retriever_with_fallback,
-)
+from lattice.prototype.retrievers.merge import rank_and_trim_snippets
+from lattice.prototype.service import PrototypeService, _run_retriever_with_fallback
 
 
 def _test_config() -> AppConfig:
@@ -148,7 +145,7 @@ def test_rank_and_trim_snippets_drops_low_relevance_entries() -> None:
         ),
     ]
 
-    ranked = _rank_and_trim_snippets(snippets)
+    ranked = rank_and_trim_snippets(snippets)
 
     assert [item.source_id for item in ranked] == ["doc#1", "graph#1"]
 
@@ -169,7 +166,7 @@ def test_rank_and_trim_snippets_keeps_best_when_all_low_scores() -> None:
         ),
     ]
 
-    ranked = _rank_and_trim_snippets(snippets)
+    ranked = rank_and_trim_snippets(snippets)
 
     assert len(ranked) == 1
     assert ranked[0].source_id == "doc#1"

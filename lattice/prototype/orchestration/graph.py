@@ -3,24 +3,44 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from lattice.prototype.models import RetrievalMode
+from lattice.prototype.orchestration.nodes import Retriever
 
 from .nodes import (
-    document_retrieval_node,
     finalize_node,
-    graph_retrieval_node,
+    make_document_retrieval_node,
+    make_graph_retrieval_node,
+    make_synthesize_node,
     merge_node,
     router_node,
-    synthesize_node,
 )
 from .state import OrchestrationState
 
 
-def build_orchestration_graph():
+def build_orchestration_graph(
+    document_retriever: Retriever | None,
+    graph_retriever: Retriever | None,
+    seed_document_retriever: Retriever,
+    seed_graph_retriever: Retriever,
+    allow_seeded_fallback: bool,
+    gemini_api_key: str | None,
+):
     graph_builder = StateGraph(OrchestrationState)
 
+    document_node = make_document_retrieval_node(
+        primary_retriever=document_retriever,
+        fallback_retriever=seed_document_retriever,
+        allow_seeded_fallback=allow_seeded_fallback,
+    )
+    graph_node = make_graph_retrieval_node(
+        primary_retriever=graph_retriever,
+        fallback_retriever=seed_graph_retriever,
+        allow_seeded_fallback=allow_seeded_fallback,
+    )
+    synthesize_node = make_synthesize_node(gemini_api_key)
+
     graph_builder.add_node("router", router_node)
-    graph_builder.add_node("document_retrieval", document_retrieval_node)
-    graph_builder.add_node("graph_retrieval", graph_retrieval_node)
+    graph_builder.add_node("document_retrieval", document_node)
+    graph_builder.add_node("graph_retrieval", graph_node)
     graph_builder.add_node("merge", merge_node)
     graph_builder.add_node("synthesize", synthesize_node)
     graph_builder.add_node("finalize", finalize_node)
