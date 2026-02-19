@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Protocol
 
 from lattice.prototype.config import AppConfig, select_supabase_retrieval_key
@@ -15,6 +16,8 @@ from lattice.prototype.retrievers.graph_retriever import (
 )
 from lattice.prototype.router_agent import route_question
 from lattice.prototype.synthesizer import synthesize_answer
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Retriever(Protocol):
@@ -73,6 +76,7 @@ async def _retrieve_snippets(
             primary_retriever=document_retriever,
             fallback_retriever=seed_document_retriever,
             allow_seeded_fallback=allow_seeded_fallback,
+            retriever_name="document",
         )
     if mode == RetrievalMode.GRAPH:
         return await _run_retriever_with_fallback(
@@ -80,6 +84,7 @@ async def _retrieve_snippets(
             primary_retriever=graph_retriever,
             fallback_retriever=seed_graph_retriever,
             allow_seeded_fallback=allow_seeded_fallback,
+            retriever_name="graph",
         )
 
     document_task = _run_retriever_with_fallback(
@@ -87,12 +92,14 @@ async def _retrieve_snippets(
         primary_retriever=document_retriever,
         fallback_retriever=seed_document_retriever,
         allow_seeded_fallback=allow_seeded_fallback,
+        retriever_name="document",
     )
     graph_task = _run_retriever_with_fallback(
         question=question,
         primary_retriever=graph_retriever,
         fallback_retriever=seed_graph_retriever,
         allow_seeded_fallback=allow_seeded_fallback,
+        retriever_name="graph",
     )
     document_results, graph_results = await asyncio.gather(document_task, graph_task)
     return [*document_results, *graph_results]
@@ -103,16 +110,37 @@ async def _run_retriever_with_fallback(
     primary_retriever: Retriever | None,
     fallback_retriever: Retriever,
     allow_seeded_fallback: bool,
+    retriever_name: str,
 ) -> list[SourceSnippet]:
     if primary_retriever is None:
         return await fallback_retriever.retrieve(question)
 
     try:
         return await primary_retriever.retrieve(question)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning(
+            "Primary retriever failed",
+            extra={"retriever": retriever_name},
+            exc_info=exc,
+        )
         if allow_seeded_fallback:
             return await fallback_retriever.retrieve(question)
-        return []
+        return [_build_retriever_error_snippet(retriever_name, exc)]
+
+
+def _build_retriever_error_snippet(
+    retriever_name: str,
+    exc: Exception,
+) -> SourceSnippet:
+    return SourceSnippet(
+        source_type="system",
+        source_id=f"retrieval_error:{retriever_name}",
+        text=(
+            f"Retriever '{retriever_name}' failed ({exc.__class__.__name__}). "
+            "Seeded fallback is disabled."
+        ),
+        score=0.0,
+    )
 
 
 def _build_document_retriever(config: AppConfig) -> Retriever | None:

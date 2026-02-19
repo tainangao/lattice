@@ -75,6 +75,7 @@ async def test_run_retriever_with_fallback_returns_fallback_when_primary_fails()
         primary_retriever=primary,
         fallback_retriever=fallback,
         allow_seeded_fallback=True,
+        retriever_name="document",
     )
 
     assert result
@@ -102,6 +103,9 @@ async def test_run_retriever_with_fallback_returns_empty_when_fallback_disabled(
         primary_retriever=primary,
         fallback_retriever=fallback,
         allow_seeded_fallback=False,
+        retriever_name="document",
     )
 
-    assert result == []
+    assert len(result) == 1
+    assert result[0].source_type == "system"
+    assert result[0].source_id == "retrieval_error:document"
