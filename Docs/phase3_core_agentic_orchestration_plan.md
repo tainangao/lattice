@@ -16,17 +16,22 @@ Scope: Introduce LangGraph fan-out/fan-in orchestration, stronger routing, and t
   - `tests/test_orchestration_graph.py`
   - `tests/test_prototype_service.py`
 - Full test suite is currently green after orchestration wiring.
+- Telemetry module is implemented and wired:
+  - `lattice/prototype/orchestration/telemetry.py`
+  - graph invoke metadata (`tags` + `request_id`) is attached
+  - structured orchestration events are emitted to logs
+- Branch telemetry payloads now include duration and branch counts.
+- Additional orchestration validation is implemented:
+  - branch-failure tests with fallback on/off in `tests/test_orchestration_graph.py`
+  - routing behavior tests in `tests/test_orchestration_routing.py`
 
 ### Partially completed
 
-- Router improvements are only partially complete: the orchestration router is wired, but mixed-intent/tie-break logic has not been expanded beyond current routing behavior.
-- Telemetry events exist in graph state (`telemetry_events`) for route selection, branch completion, fan-in, synthesis, and finalize steps, but dedicated telemetry module/log sink integration is not complete.
-- Tests and validation are partially complete: orchestration path coverage exists, but targeted failure-path orchestration tests (single-branch failure with fallback on/off) are still pending.
+- Router improvements are in progress: tie-break behavior is improved and covered by orchestration routing tests, but rule sophistication is still heuristic and should be refined with production telemetry.
+- Telemetry foundation is complete, but deeper observability integration (for example LangSmith dashboards/queries) is still pending.
 
 ### Not completed yet
 
-- Dedicated telemetry module (`lattice/prototype/orchestration/telemetry.py`) and structured log emission pipeline.
-- Additional orchestration-focused routing tests file (`tests/test_orchestration_routing.py`).
 - Neo4j GraphRAG migration work (`HybridRetriever` / `HybridCypherRetriever`) remains evaluation/planning only.
 
 ## Why this phase now
@@ -176,3 +181,16 @@ Complete the remaining Phase 3 gaps in this order:
 2. Add orchestration failure-path tests (branch failure with fallback on/off).
 3. Add routing-behavior tests focused on mixed-intent and tie-break outcomes.
 4. Re-run full unit + integration suite and update this status section.
+
+## Execution plan (active)
+
+- [x] **Step A:** Implement `lattice/prototype/orchestration/telemetry.py` and wire structured event emission from orchestration state.
+- [x] **Step B:** Add duration + branch metrics in node telemetry payloads.
+- [x] **Step C:** Add tests for telemetry config/event emission and keep orchestration tests green.
+- [x] **Step D:** Run full test regression and update this status section with completion notes.
+
+## Execution plan (next)
+
+- [x] **Step E:** Improve router tie-break logic (reduce ambiguous defaults while preserving compatibility).
+- [ ] **Step F:** Add richer telemetry dimensions (fallback-used flag, branch error class, retriever mode) for operational triage.
+- [ ] **Step G:** Run a GraphRAG migration spike behind config flags (`HybridRetriever` / `HybridCypherRetriever`) with regression comparison.
