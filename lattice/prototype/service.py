@@ -26,8 +26,10 @@ from lattice.prototype.retrievers.document_retriever import (
     SupabaseDocumentRetriever,
 )
 from lattice.prototype.retrievers.graph_retriever import (
+    Neo4jGraphRagRetriever,
     Neo4jGraphRetriever,
     SeedGraphRetriever,
+    build_graphrag_embedder,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -214,10 +216,80 @@ def _build_graph_retriever(config: AppConfig) -> Retriever | None:
         return None
     if not config.neo4j_uri or not config.neo4j_username or not config.neo4j_password:
         return None
+    if config.use_neo4j_graphrag_hybrid:
+        return _build_graphrag_hybrid_retriever(config)
     return Neo4jGraphRetriever(
         uri=config.neo4j_uri,
         username=config.neo4j_username,
         password=config.neo4j_password,
+        database=config.neo4j_database,
+        scan_limit=config.neo4j_scan_limit,
+    )
+
+
+def _build_graphrag_hybrid_retriever(config: AppConfig) -> Retriever:
+    mode = config.neo4j_graphrag_retriever_mode.strip().lower()
+    if mode not in {"hybrid", "hybrid_cypher"}:
+        LOGGER.warning(
+            "Unsupported GraphRAG retriever mode; falling back to cypher retriever",
+            extra={"retriever_mode": mode},
+        )
+        return _build_default_cypher_retriever(config)
+
+    if (
+        not config.neo4j_graphrag_vector_index
+        or not config.neo4j_graphrag_fulltext_index
+    ):
+        LOGGER.warning(
+            "GraphRAG hybrid prerequisites missing; falling back to cypher retriever"
+        )
+        return _build_default_cypher_retriever(config)
+
+    if mode == "hybrid_cypher" and not config.neo4j_graphrag_hybrid_cypher_query:
+        LOGGER.warning(
+            "HybridCypherRetriever query missing; falling back to cypher retriever"
+        )
+        return _build_default_cypher_retriever(config)
+
+    embedder = build_graphrag_embedder(
+        provider=config.neo4j_graphrag_embedder_provider,
+        gemini_api_key=config.gemini_api_key,
+        google_model=config.neo4j_graphrag_google_model,
+        openai_model=config.neo4j_graphrag_openai_model,
+    )
+    if embedder is None:
+        LOGGER.warning(
+            "GraphRAG embedder unavailable; falling back to cypher retriever",
+            extra={"provider": config.neo4j_graphrag_embedder_provider},
+        )
+        return _build_default_cypher_retriever(config)
+
+    try:
+        return Neo4jGraphRagRetriever(
+            uri=config.neo4j_uri or "",
+            username=config.neo4j_username or "",
+            password=config.neo4j_password or "",
+            database=config.neo4j_database,
+            vector_index_name=config.neo4j_graphrag_vector_index,
+            fulltext_index_name=config.neo4j_graphrag_fulltext_index,
+            retriever_mode=mode,
+            embedder=embedder,
+            hybrid_cypher_query=config.neo4j_graphrag_hybrid_cypher_query,
+        )
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning(
+            "GraphRAG retriever initialization failed; falling back to cypher retriever",
+            exc_info=exc,
+            extra={"retriever_mode": mode},
+        )
+        return _build_default_cypher_retriever(config)
+
+
+def _build_default_cypher_retriever(config: AppConfig) -> Retriever:
+    return Neo4jGraphRetriever(
+        uri=config.neo4j_uri or "",
+        username=config.neo4j_username or "",
+        password=config.neo4j_password or "",
         database=config.neo4j_database,
         scan_limit=config.neo4j_scan_limit,
     )

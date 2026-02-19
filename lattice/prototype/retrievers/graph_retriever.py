@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
+import inspect
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -164,6 +167,189 @@ class Neo4jGraphRetriever:
             return [_record_to_result(record) for record in records]
 
 
+class Neo4jGraphRagRetriever:
+    def __init__(
+        self,
+        uri: str,
+        username: str,
+        password: str,
+        database: str,
+        vector_index_name: str,
+        fulltext_index_name: str,
+        retriever_mode: str,
+        embedder: Any,
+        hybrid_cypher_query: str | None,
+    ) -> None:
+        retrievers_module = importlib.import_module("neo4j_graphrag.retrievers")
+
+        self._driver = GraphDatabase.driver(uri, auth=(username, password))
+        mode = retriever_mode.strip().lower()
+        if mode == "hybrid_cypher":
+            hybrid_cypher = getattr(retrievers_module, "HybridCypherRetriever", None)
+            if hybrid_cypher is None:
+                raise ValueError("HybridCypherRetriever is not available")
+            if not hybrid_cypher_query:
+                raise ValueError(
+                    "HybridCypherRetriever requires retrieval query config"
+                )
+            self._retriever = hybrid_cypher(
+                driver=self._driver,
+                vector_index_name=vector_index_name,
+                fulltext_index_name=fulltext_index_name,
+                retrieval_query=hybrid_cypher_query,
+                embedder=embedder,
+                neo4j_database=database,
+            )
+        else:
+            hybrid_retriever = getattr(retrievers_module, "HybridRetriever", None)
+            if hybrid_retriever is None:
+                raise ValueError("HybridRetriever is not available")
+            self._retriever = hybrid_retriever(
+                driver=self._driver,
+                vector_index_name=vector_index_name,
+                fulltext_index_name=fulltext_index_name,
+                embedder=embedder,
+                return_properties=[
+                    "show_id",
+                    "title",
+                    "type",
+                    "release_year",
+                    "description",
+                ],
+                neo4j_database=database,
+            )
+
+    async def retrieve(self, question: str, limit: int = 3) -> list[SourceSnippet]:
+        return await asyncio.to_thread(self._retrieve_sync, question, limit)
+
+    def _retrieve_sync(self, question: str, limit: int) -> list[SourceSnippet]:
+        result = self._retriever.search(query_text=question, top_k=max(limit, 1))
+        items = getattr(result, "items", [])
+        if not isinstance(items, list):
+            return []
+        return [
+            _graphrag_item_to_snippet(item, index)
+            for index, item in enumerate(items[:limit])
+        ]
+
+
+def build_graphrag_embedder(
+    provider: str,
+    gemini_api_key: str | None,
+    google_model: str,
+    openai_model: str,
+) -> Any | None:
+    preferred = provider.strip().lower()
+    providers = [preferred]
+    if preferred == "google":
+        providers.append("openai")
+
+    for current_provider in providers:
+        if current_provider == "google":
+            embedder = _build_google_embedder(gemini_api_key, google_model)
+            if embedder is not None:
+                return embedder
+        if current_provider == "openai":
+            embedder = _build_openai_embedder(openai_model)
+            if embedder is not None:
+                return embedder
+
+    return None
+
+
+def _build_google_embedder(gemini_api_key: str | None, google_model: str) -> Any | None:
+    if not gemini_api_key:
+        return None
+
+    os.environ.setdefault("GOOGLE_API_KEY", gemini_api_key)
+    embeddings_module = _import_graphrag_embeddings_module()
+    if embeddings_module is None:
+        return None
+
+    for class_name in (
+        "GoogleGenAIEmbeddings",
+        "VertexAIEmbeddings",
+        "GoogleEmbeddings",
+    ):
+        embedder_class = getattr(embeddings_module, class_name, None)
+        if embedder_class is None:
+            continue
+        embedder = _instantiate_embedder(
+            embedder_class,
+            {
+                "model": google_model,
+                "api_key": gemini_api_key,
+                "google_api_key": gemini_api_key,
+            },
+        )
+        if embedder is not None:
+            return embedder
+
+    return None
+
+
+def _build_openai_embedder(openai_model: str) -> Any | None:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return None
+
+    embeddings_module = _import_graphrag_embeddings_module()
+    if embeddings_module is None:
+        return None
+
+    embedder_class = getattr(embeddings_module, "OpenAIEmbeddings", None)
+    if embedder_class is None:
+        return None
+    return _instantiate_embedder(
+        embedder_class,
+        {"model": openai_model, "api_key": api_key},
+    )
+
+
+def _import_graphrag_embeddings_module() -> Any | None:
+    try:
+        return importlib.import_module("neo4j_graphrag.embeddings")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _instantiate_embedder(
+    embedder_class: Any, candidate_kwargs: dict[str, str]
+) -> Any | None:
+    try:
+        signature = inspect.signature(embedder_class)
+    except Exception:  # noqa: BLE001
+        signature = None
+
+    kwargs = _filter_supported_kwargs(candidate_kwargs, signature)
+    try:
+        return embedder_class(**kwargs)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _filter_supported_kwargs(
+    candidate_kwargs: dict[str, str],
+    signature: inspect.Signature | None,
+) -> dict[str, str]:
+    if signature is None:
+        return candidate_kwargs
+
+    parameters = signature.parameters
+    supports_var_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    if supports_var_kwargs:
+        return candidate_kwargs
+
+    return {
+        key: value
+        for key, value in candidate_kwargs.items()
+        if key in parameters and value is not None
+    }
+
+
 def _edge_text(edge: dict[str, str]) -> str:
     return " ".join(
         [
@@ -306,3 +492,36 @@ def _record_to_edge(record: Any) -> dict[str, str]:
         "target": target if isinstance(target, str) else str(target),
         "evidence": evidence if isinstance(evidence, str) else str(evidence),
     }
+
+
+def _graphrag_item_to_snippet(item: Any, index: int) -> SourceSnippet:
+    content = getattr(item, "content", None)
+    metadata = getattr(item, "metadata", None)
+    metadata_map = metadata if isinstance(metadata, dict) else {}
+
+    if isinstance(content, dict):
+        title = str(content.get("title") or f"GraphRAG result {index + 1}")
+        title_type = str(content.get("type") or "Unknown")
+        description = str(content.get("description") or "")
+        source_key = str(
+            content.get("show_id")
+            or metadata_map.get("id")
+            or metadata_map.get("elementId")
+            or title
+        )
+        text = f"{title} ({title_type}). {description}".strip()
+    else:
+        title = f"GraphRAG result {index + 1}"
+        source_key = str(
+            metadata_map.get("id") or metadata_map.get("elementId") or title
+        )
+        text = str(content) if content is not None else ""
+
+    raw_score = metadata_map.get("score")
+    score = _coerce_float(raw_score) if raw_score is not None else 0.5
+    return SourceSnippet(
+        source_type="graph",
+        source_id=f"Title:{source_key}",
+        text=text or title,
+        score=min(max(score, 0.0), 1.0),
+    )

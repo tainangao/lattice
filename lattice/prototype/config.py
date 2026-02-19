@@ -12,12 +12,20 @@ class AppConfig:
     supabase_service_role_key: str | None
     use_real_supabase: bool
     use_real_neo4j: bool
+    use_neo4j_graphrag_hybrid: bool
     allow_seeded_fallback: bool
     allow_service_role_for_retrieval: bool
     neo4j_uri: str | None
     neo4j_username: str | None
     neo4j_password: str | None
     neo4j_database: str
+    neo4j_graphrag_vector_index: str | None
+    neo4j_graphrag_fulltext_index: str | None
+    neo4j_graphrag_retriever_mode: str
+    neo4j_graphrag_embedder_provider: str
+    neo4j_graphrag_google_model: str
+    neo4j_graphrag_openai_model: str
+    neo4j_graphrag_hybrid_cypher_query: str | None
     supabase_documents_table: str
     neo4j_scan_limit: int
     prototype_docs_path: str
@@ -64,6 +72,9 @@ def load_config() -> AppConfig:
         supabase_service_role_key=_read_optional_env("SUPABASE_SERVICE_ROLE_KEY"),
         use_real_supabase=_read_bool_env("USE_REAL_SUPABASE", default=False),
         use_real_neo4j=_read_bool_env("USE_REAL_NEO4J", default=False),
+        use_neo4j_graphrag_hybrid=_read_bool_env(
+            "USE_NEO4J_GRAPHRAG_HYBRID", default=False
+        ),
         allow_seeded_fallback=_read_bool_env("ALLOW_SEEDED_FALLBACK", default=True),
         allow_service_role_for_retrieval=_read_bool_env(
             "ALLOW_SERVICE_ROLE_FOR_RETRIEVAL", default=False
@@ -72,6 +83,29 @@ def load_config() -> AppConfig:
         neo4j_username=_read_optional_env("NEO4J_USERNAME"),
         neo4j_password=_read_optional_env("NEO4J_PASSWORD"),
         neo4j_database=os.getenv("NEO4J_DATABASE", "neo4j"),
+        neo4j_graphrag_vector_index=_read_optional_env("NEO4J_GRAPHRAG_VECTOR_INDEX"),
+        neo4j_graphrag_fulltext_index=_read_optional_env(
+            "NEO4J_GRAPHRAG_FULLTEXT_INDEX"
+        ),
+        neo4j_graphrag_retriever_mode=os.getenv(
+            "NEO4J_GRAPHRAG_RETRIEVER_MODE", "hybrid"
+        ).strip()
+        or "hybrid",
+        neo4j_graphrag_embedder_provider=os.getenv(
+            "NEO4J_GRAPHRAG_EMBEDDER_PROVIDER", "google"
+        ).strip()
+        or "google",
+        neo4j_graphrag_google_model=os.getenv(
+            "NEO4J_GRAPHRAG_GOOGLE_MODEL", "text-embedding-004"
+        ).strip()
+        or "text-embedding-004",
+        neo4j_graphrag_openai_model=os.getenv(
+            "NEO4J_GRAPHRAG_OPENAI_MODEL", "text-embedding-3-small"
+        ).strip()
+        or "text-embedding-3-small",
+        neo4j_graphrag_hybrid_cypher_query=_read_optional_env(
+            "NEO4J_GRAPHRAG_HYBRID_CYPHER_QUERY"
+        ),
         supabase_documents_table=os.getenv("SUPABASE_DOCUMENTS_TABLE", "embeddings"),
         neo4j_scan_limit=_read_int_env("NEO4J_SCAN_LIMIT", default=200),
         prototype_docs_path=os.getenv(

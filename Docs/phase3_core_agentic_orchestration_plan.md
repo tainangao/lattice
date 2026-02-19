@@ -29,10 +29,15 @@ Scope: Introduce LangGraph fan-out/fan-in orchestration, stronger routing, and t
 
 - Router improvements are in progress: tie-break behavior is improved and covered by orchestration routing tests, but rule sophistication is still heuristic and should be refined with production telemetry.
 - Telemetry foundation plus Step F dimensions are implemented (fallback-used flag, branch error class, retriever mode). Remaining work is deeper observability integration (for example LangSmith dashboards/queries).
+- Step G migration spike is now in progress:
+  - GraphRAG retriever is gated behind config and supports retriever mode selection (`hybrid` / `hybrid_cypher`).
+  - Embedder selection is provider-based with Google/Gemini-first behavior and optional OpenAI fallback.
+  - Focused fallback tests and regression comparison artifacts were added.
+  - Remaining work: run regression script against real Neo4j setup and record outcome summary in this document.
 
 ### Not completed yet
 
-- Neo4j GraphRAG migration work (`HybridRetriever` / `HybridCypherRetriever`) remains evaluation/planning only.
+- Final Step G evidence capture from live connector regression run is still pending.
 
 ## Why this phase now
 
@@ -194,3 +199,43 @@ Complete the remaining Phase 3 gaps in this order:
 - [x] **Step E:** Improve router tie-break logic (reduce ambiguous defaults while preserving compatibility).
 - [x] **Step F:** Add richer telemetry dimensions (fallback-used flag, branch error class, retriever mode) for operational triage.
 - [ ] **Step G:** Run a GraphRAG migration spike behind config flags (`HybridRetriever` / `HybridCypherRetriever`) with regression comparison.
+  - Status: implementation + tests + regression artifacts added; live-run evidence pending.
+
+## Step G implementation plan (approved)
+
+Goal: complete a safe, Gemini-first GraphRAG migration spike behind feature flags with clear regression evidence.
+
+1. **Config and mode surface**
+   - Keep `USE_NEO4J_GRAPHRAG_HYBRID` as the rollout gate.
+   - Add retriever mode enum config (default `hybrid`) with explicit `hybrid_cypher` support.
+   - Add GraphRAG provider config with default `google` and optional `openai`.
+   - Add provider-specific embedding model config fields and optional HybridCypher retrieval query config.
+
+2. **Retriever integration (Gemini-first)**
+   - Refactor GraphRAG retriever construction to use provider-based embedder selection.
+   - Default to Google/Gemini-compatible embedder path (using existing `gemini_api_key` flow) and keep OpenAI as optional fallback.
+   - Add explicit dependency/prerequisite guards (missing package, provider class, index names, or required API key) with warning logs and fallback to current Cypher retriever.
+
+3. **HybridCypherRetriever path**
+   - Add a dedicated GraphRAG retriever path for `HybridCypherRetriever` behind retriever mode config.
+   - Require retrieval query configuration for `hybrid_cypher`; if absent, degrade safely to current Cypher retriever with structured warning.
+
+4. **Regression comparison artifacts**
+   - Add a fixed query set for Step G comparison.
+   - Add a regression runner artifact that compares baseline Cypher vs GraphRAG Hybrid vs GraphRAG HybridCypher on:
+     - route mode,
+     - snippet IDs/scores/count,
+     - retrieval latency.
+   - Emit machine-readable output for reproducibility.
+
+5. **Focused tests**
+   - Add tests covering:
+     - retriever mode selection,
+     - Google-first provider defaults,
+     - fallback when dependency/provider class is unavailable,
+     - fallback when index names or provider keys are missing,
+     - fallback when `hybrid_cypher` query config is missing.
+
+6. **Validation sequence**
+   - Run targeted unit tests for config/service/retriever selection first.
+   - Run broader prototype test suite regression after targeted tests pass.
