@@ -47,7 +47,13 @@ Set these in Space Settings -> Variables and secrets -> Variables:
 From local repository:
 
 ```bash
-git push huggingface main
+./scripts/deploy_hf.sh
+```
+
+Optional override (remote + target branch):
+
+```bash
+./scripts/deploy_hf.sh huggingface main
 ```
 
 After push, Space rebuild starts automatically.
