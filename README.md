@@ -60,6 +60,15 @@ In Chainlit chat, set a temporary Gemini key for the current chat session:
 
 This key stays in memory for the active chat session only.
 
+Related commands:
+
+```text
+/clearkey
+/help
+```
+
+Public demo sessions can be rate-limited with `PUBLIC_DEMO_QUERY_LIMIT`.
+
 ## API runtime key override
 
 You can provide a request-scoped Gemini key without writing it to server config:

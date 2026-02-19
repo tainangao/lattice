@@ -64,6 +64,20 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 **Status (2026-02-19):** In progress.
 
+* **Progress audit (2026-02-19, updated):**
+* **Done:**
+  * Step A complete: Dockerized Space baseline is live (`app_port: 7860`, startup timeout configured).
+  * Step B complete: runtime secrets/variables are documented and consumed via env-based config.
+  * Step C complete: API supports request-scoped `X-Gemini-Api-Key`; Chainlit supports session-scoped `/setkey`.
+  * Step D complete: operational runbook exists with Space secrets/variables, health checks, and deploy flow (`./scripts/deploy_hf.sh`).
+  * Step E baseline complete: regression coverage exists for key runtime/deployment paths with seeded fallback behavior preserved.
+* **Not done yet:**
+  * Chainlit onboarding polish is partial (command UX and guidance are improving, but full user journey copy and affordances still need refinement).
+  * Cold-start flow is partially implemented (public demo quota + key escalation started, auth layer still pending by design).
+  * Security hardening follow-up remains: explicit RLS policy verification checklist and deployment-time validation evidence.
+  * Basic monitoring is partial: health endpoints and telemetry events exist, but no consolidated production dashboard/alerts yet.
+  * Final Phase 5 close criteria and sign-off checklist are not yet documented.
+
 * **Execution strategy (quality vs speed):**
 * Ship a pragmatic single-pass critic + one bounded refinement loop first, behind config defaults.
 * Keep all behavior additive and non-breaking to preserve Phase 3 API contract and velocity.
@@ -134,6 +148,10 @@ This roadmap is organized to deliver visible user results early, then incrementa
 * API supports per-request runtime key override without server-side persistence.
 * Chainlit supports session-level runtime key override without disk persistence.
 * Full regression suite remains green.
+
+* **Current build focus (started 2026-02-19):**
+* Add cold-start UX controls in Chainlit (public demo quota, clear key lifecycle commands, and user-visible quota feedback).
+* Keep API contract unchanged while improving frontend onboarding behavior.
 
 ## Milestone Summary
 

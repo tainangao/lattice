@@ -41,6 +41,7 @@ Set these in Space Settings -> Variables and secrets -> Variables:
 - `PHASE4_MAX_REFINEMENT_ROUNDS=1`
 - `PHASE4_INITIAL_RETRIEVAL_LIMIT=3`
 - `PHASE4_REFINEMENT_RETRIEVAL_LIMIT=5`
+- `PUBLIC_DEMO_QUERY_LIMIT=3`
 
 ## 4) Push and deploy
 
@@ -70,6 +71,7 @@ After push, Space rebuild starts automatically.
 
 - API: request-scoped key via `X-Gemini-Api-Key` header.
 - Chainlit: session-scoped key via `/setkey <key>` command.
+- Chainlit: remove session key with `/clearkey`; show command help with `/help`.
 - Keys are not persisted to repository files.
 
 ## 7) Known operational notes
