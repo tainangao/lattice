@@ -3,6 +3,32 @@
 Date: 2026-02-19
 Scope: Introduce LangGraph fan-out/fan-in orchestration, stronger routing, and telemetry while preserving the current API contract.
 
+## Implementation status (as of 2026-02-19)
+
+### Completed
+
+- LangGraph orchestration module created with typed state and reducer-safe fields.
+- Router, retrieval branch, merge, synthesize, and finalize nodes are implemented.
+- `PrototypeService` delegates query execution through the orchestration graph (all modes).
+- Fan-out/fan-in path is active for `both` route with merged ranking/trim behavior.
+- Existing fallback behavior is preserved in orchestration branches (seeded fallback and diagnostic system snippet when fallback is disabled).
+- Core orchestration tests were added and updated:
+  - `tests/test_orchestration_graph.py`
+  - `tests/test_prototype_service.py`
+- Full test suite is currently green after orchestration wiring.
+
+### Partially completed
+
+- Router improvements are only partially complete: the orchestration router is wired, but mixed-intent/tie-break logic has not been expanded beyond current routing behavior.
+- Telemetry events exist in graph state (`telemetry_events`) for route selection, branch completion, fan-in, synthesis, and finalize steps, but dedicated telemetry module/log sink integration is not complete.
+- Tests and validation are partially complete: orchestration path coverage exists, but targeted failure-path orchestration tests (single-branch failure with fallback on/off) are still pending.
+
+### Not completed yet
+
+- Dedicated telemetry module (`lattice/prototype/orchestration/telemetry.py`) and structured log emission pipeline.
+- Additional orchestration-focused routing tests file (`tests/test_orchestration_routing.py`).
+- Neo4j GraphRAG migration work (`HybridRetriever` / `HybridCypherRetriever`) remains evaluation/planning only.
+
 ## Why this phase now
 
 Phase 1 proved end-to-end viability, and Phase 2 stabilized real data connectors (Supabase + Neo4j) with integration coverage. Phase 3 now upgrades control flow from a mostly linear service path to explicit agentic orchestration.
@@ -144,4 +170,9 @@ This plan aligns with:
 
 ## Immediate next step
 
-Start implementation with state schema + LangGraph scaffold and keep the current service contract as the compatibility boundary.
+Complete the remaining Phase 3 gaps in this order:
+
+1. Add telemetry module + structured emission (logs first, LangSmith-ready hooks).
+2. Add orchestration failure-path tests (branch failure with fallback on/off).
+3. Add routing-behavior tests focused on mixed-intent and tie-break outcomes.
+4. Re-run full unit + integration suite and update this status section.
