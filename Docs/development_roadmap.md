@@ -41,6 +41,8 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 **Goal:** Upgrade from basic flow to robust parallel orchestration.
 
+**Status (2026-02-19):** Closed for core scope. GraphRAG migration is deferred follow-up.
+
 * **LangGraph Orchestration:**
 * Implement full fan-out/fan-in flow with explicit state transitions.
 * Run retrieval agents concurrently with Python `asyncio` to reduce latency.
@@ -51,6 +53,10 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 * **Retriever Enhancements:**
 * Improve graph retrieval depth and vector ranking quality.
+
+* **Execution note (2026-02-19):**
+* `neo4j-graphrag` migration is on hold and treated as optional follow-up, not a Phase 3 close blocker.
+* Phase 3 closure focuses on shipped LangGraph fan-out/fan-in orchestration, routing hardening, telemetry, and regression stability with current retrievers.
 
 ### Phase 4: Critic, Feedback Loops, and Answer Quality
 
@@ -88,5 +94,6 @@ This roadmap is organized to deliver visible user results early, then incrementa
 1. **Prototype Demo Ready:** End-to-end answer flow in Chainlit.
 2. **Data Foundations Stable:** Reliable ingestion and secure storage.
 3. **Agentic Orchestration Mature:** Parallel retrieval and stronger routing.
+   - `neo4j-graphrag` adoption remains deferred until provider/runtime prerequisites are stable.
 4. **Quality Layer Active:** Critic and feedback loops in production logic.
 5. **Production Launch:** Hardened UX, security, and deployment.

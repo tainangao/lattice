@@ -35,9 +35,38 @@ Scope: Introduce LangGraph fan-out/fan-in orchestration, stronger routing, and t
   - Focused fallback tests and regression comparison artifacts were added.
   - Remaining work: run regression script against real Neo4j setup and record outcome summary in this document.
 
+### On hold (explicit)
+
+- `neo4j-graphrag` adoption is paused for Phase 3 closeout.
+  - Reason: provider/credential friction (Gemini without Vertex support in current dependency path, unavailable OpenAI production key) blocks reliable GraphRAG live execution.
+  - Decision: keep GraphRAG code paths behind flags as experimental only; do not make them part of Phase 3 critical path.
+  - Resume criteria:
+    1. stable embedding provider path is available in project runtime,
+    2. preflight reports `ready_for_graphrag=true`, and
+    3. regression output shows non-fallback backends (`graphrag_hybrid` and `graphrag_hybrid_cypher`).
+
 ### Not completed yet
 
-- Final Step G evidence capture from live connector regression run is still pending.
+- No Phase 3 blockers remain in orchestration/routing/telemetry core scope.
+- Optional Step G GraphRAG adoption remains paused and is moved out of Phase 3 close criteria.
+
+## Phase 3 closeout status (2026-02-19)
+
+Phase 3 is closed for core scope (orchestration, routing, telemetry, and regression stability).
+
+### Closure checklist
+
+- [x] LangGraph fan-out/fan-in orchestration is active for direct, document, graph, and both paths.
+- [x] Router tie-break and mixed-intent routing behavior is implemented and covered by tests.
+- [x] Structured telemetry is emitted with route, branch duration/count, fallback-used, retriever mode, and branch error class dimensions.
+- [x] Failure-path behavior is validated (branch failure with fallback on/off).
+- [x] API response contract for `/api/prototype/query` is preserved.
+- [x] Full regression suite is green (`pytest`: 38 passed on 2026-02-19).
+- [x] GraphRAG migration work is explicitly deferred and non-blocking for Phase 3 close.
+
+### Deferred follow-up
+
+- Step G (`neo4j-graphrag` adoption) remains on hold and is tracked as a post-Phase-3 follow-up.
 
 ## Why this phase now
 
@@ -199,7 +228,8 @@ Complete the remaining Phase 3 gaps in this order:
 - [x] **Step E:** Improve router tie-break logic (reduce ambiguous defaults while preserving compatibility).
 - [x] **Step F:** Add richer telemetry dimensions (fallback-used flag, branch error class, retriever mode) for operational triage.
 - [ ] **Step G:** Run a GraphRAG migration spike behind config flags (`HybridRetriever` / `HybridCypherRetriever`) with regression comparison.
-  - Status: implementation + tests + regression artifacts added; live-run evidence pending.
+  - Status: implementation + tests + regression artifacts added; live evidence captured with backend signal. Final completion pending successful non-fallback GraphRAG run.
+  - Phase gate update: Step G is now non-blocking for Phase 3 closure and tracked as deferred follow-up.
 
 ## Step G implementation plan (approved)
 
@@ -239,3 +269,29 @@ Goal: complete a safe, Gemini-first GraphRAG migration spike behind feature flag
 6. **Validation sequence**
    - Run targeted unit tests for config/service/retriever selection first.
    - Run broader prototype test suite regression after targeted tests pass.
+
+## Step G regression evidence (2026-02-19)
+
+### Run command
+
+- `PYTHONPATH=. python scripts/regression/compare_graphrag_retrievers.py`
+
+### Evidence artifacts
+
+- Query set: `Docs/step_g_graphrag_regression_queries.json`
+- Runner: `scripts/regression/compare_graphrag_retrievers.py`
+- Output JSON: `.tmp/regression/step_g_graphrag_comparison.json`
+
+### Results summary
+
+- `cypher` mode reported `active_graph_backend=cypher`.
+- `hybrid` mode reported `active_graph_backend=cypher_fallback_from_hybrid`.
+- `hybrid_cypher` mode reported `active_graph_backend=cypher_fallback_from_hybrid_cypher`.
+- Route behavior remained stable across modes (`both`/`graph` by query intent), and snippet sets/scores were consistent with baseline for this run.
+
+### Interpretation
+
+- The backend signal confirms the live run did not execute GraphRAG retrievers and instead fell back to the legacy Cypher retriever for hybrid modes.
+- Step G evidence is now explicit and reproducible, but Step G should remain open until at least one live run reports:
+  - `active_graph_backend=graphrag_hybrid` for `hybrid`, and
+  - `active_graph_backend=graphrag_hybrid_cypher` for `hybrid_cypher`.
