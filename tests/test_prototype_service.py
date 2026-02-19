@@ -2,7 +2,11 @@ import pytest
 
 from lattice.prototype.config import AppConfig
 from lattice.prototype.models import RetrievalMode, SourceSnippet
-from lattice.prototype.service import PrototypeService, _run_retriever_with_fallback
+from lattice.prototype.service import (
+    PrototypeService,
+    _rank_and_trim_snippets,
+    _run_retriever_with_fallback,
+)
 
 
 def _test_config() -> AppConfig:
@@ -109,3 +113,52 @@ async def test_run_retriever_with_fallback_returns_empty_when_fallback_disabled(
     assert len(result) == 1
     assert result[0].source_type == "system"
     assert result[0].source_id == "retrieval_error:document"
+
+
+def test_rank_and_trim_snippets_drops_low_relevance_entries() -> None:
+    snippets = [
+        SourceSnippet(
+            source_type="document",
+            source_id="doc#1",
+            text="high score document",
+            score=0.9,
+        ),
+        SourceSnippet(
+            source_type="graph",
+            source_id="graph#1",
+            text="mid score graph",
+            score=0.5,
+        ),
+        SourceSnippet(
+            source_type="document",
+            source_id="doc#2",
+            text="low score document",
+            score=0.1,
+        ),
+    ]
+
+    ranked = _rank_and_trim_snippets(snippets)
+
+    assert [item.source_id for item in ranked] == ["doc#1", "graph#1"]
+
+
+def test_rank_and_trim_snippets_keeps_best_when_all_low_scores() -> None:
+    snippets = [
+        SourceSnippet(
+            source_type="document",
+            source_id="doc#1",
+            text="low score document",
+            score=0.05,
+        ),
+        SourceSnippet(
+            source_type="graph",
+            source_id="graph#1",
+            text="lower score graph",
+            score=0.01,
+        ),
+    ]
+
+    ranked = _rank_and_trim_snippets(snippets)
+
+    assert len(ranked) == 1
+    assert ranked[0].source_id == "doc#1"

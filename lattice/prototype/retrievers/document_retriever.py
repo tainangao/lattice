@@ -10,6 +10,34 @@ from supabase import Client, create_client
 from lattice.prototype.models import SourceSnippet
 from lattice.prototype.retrievers.scoring import overlap_score, tokenize
 
+DOCUMENT_QUERY_STOP_WORDS = {
+    "a",
+    "about",
+    "an",
+    "and",
+    "are",
+    "document",
+    "documents",
+    "does",
+    "file",
+    "files",
+    "for",
+    "from",
+    "how",
+    "in",
+    "is",
+    "of",
+    "on",
+    "please",
+    "tell",
+    "that",
+    "the",
+    "this",
+    "what",
+    "which",
+    "with",
+}
+
 
 class SeedDocumentRetriever:
     def __init__(self, docs_path: str) -> None:
@@ -45,21 +73,29 @@ class SupabaseDocumentRetriever:
         return await asyncio.to_thread(self._retrieve_sync, question, limit)
 
     def _retrieve_sync(self, question: str, limit: int) -> list[SourceSnippet]:
+        query_tokens = _document_query_tokens(question)
         rows = self._fetch_candidate_rows(question, max(limit * 20, 100))
         ranked = sorted(
             rows,
-            key=lambda item: overlap_score(question, _row_content(item)),
+            key=lambda item: _document_overlap_score(
+                question, _row_content(item), query_tokens
+            ),
             reverse=True,
         )
         top_rows = [
-            item for item in ranked if overlap_score(question, _row_content(item)) > 0
+            item
+            for item in ranked
+            if _document_overlap_score(question, _row_content(item), query_tokens)
+            >= 0.12
         ][:limit]
         return [
             SourceSnippet(
                 source_type="document",
                 source_id=_row_source_id(item),
                 text=_row_content(item),
-                score=overlap_score(question, _row_content(item)),
+                score=_document_overlap_score(
+                    question, _row_content(item), query_tokens
+                ),
             )
             for item in top_rows
         ]
@@ -76,12 +112,36 @@ class SupabaseDocumentRetriever:
         return [item for item in rows if isinstance(item, dict)]
 
     def _query_candidate_rows(self, question: str, fetch_limit: int) -> Any:
-        tokens = [token for token in tokenize(question) if len(token) >= 4][:6]
+        tokens = _document_query_tokens(question)[:6]
         query = self._client.table(self._table_name).select("*")
         if tokens:
             clauses = [f"content.ilike.%{token}%" for token in tokens]
             query = query.or_(",".join(clauses))
         return query.limit(fetch_limit).execute()
+
+
+def _document_query_tokens(question: str) -> list[str]:
+    return [
+        token
+        for token in tokenize(question)
+        if len(token) >= 4 and token not in DOCUMENT_QUERY_STOP_WORDS
+    ]
+
+
+def _document_overlap_score(
+    question: str,
+    content: str,
+    query_tokens: list[str] | None = None,
+) -> float:
+    tokens = (
+        query_tokens if query_tokens is not None else _document_query_tokens(question)
+    )
+    if not tokens:
+        return overlap_score(question, content)
+
+    content_tokens = tokenize(content)
+    hits = sum(1 for token in tokens if token in content_tokens)
+    return hits / len(tokens)
 
 
 def _load_seed_documents(path: str) -> list[dict[str, str]]:
