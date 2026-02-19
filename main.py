@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.responses import JSONResponse
 
-from lattice.prototype.config import load_config
+from lattice.prototype.config import load_config, with_runtime_gemini_key
 from lattice.prototype.data_health import build_data_health_report
 from lattice.prototype.models import QueryRequest
 from lattice.prototype.service import PrototypeService
@@ -27,8 +27,12 @@ async def health_data() -> JSONResponse:
 
 
 @app.post("/api/prototype/query")
-async def query_prototype(payload: QueryRequest) -> JSONResponse:
-    service = PrototypeService(load_config())
+async def query_prototype(
+    payload: QueryRequest,
+    x_gemini_api_key: str | None = Header(default=None, alias="X-Gemini-Api-Key"),
+) -> JSONResponse:
+    config = with_runtime_gemini_key(load_config(), x_gemini_api_key)
+    service = PrototypeService(config)
     result = await service.run_query(payload.question)
     return JSONResponse(content=result.model_dump())
 

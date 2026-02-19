@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True)
@@ -158,3 +158,15 @@ def select_supabase_retrieval_key(config: AppConfig) -> tuple[str | None, str | 
     if config.allow_service_role_for_retrieval and config.supabase_service_role_key:
         return config.supabase_service_role_key, "SUPABASE_SERVICE_ROLE_KEY"
     return None, None
+
+
+def with_runtime_gemini_key(
+    config: AppConfig,
+    runtime_gemini_api_key: str | None,
+) -> AppConfig:
+    if runtime_gemini_api_key is None:
+        return config
+    key = runtime_gemini_api_key.strip()
+    if not key:
+        return config
+    return replace(config, gemini_api_key=key)

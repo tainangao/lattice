@@ -103,6 +103,12 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 **Goal:** Ship a secure, user-friendly product for real usage.
 
+**Status (2026-02-19):** In progress.
+
+* **Execution strategy (quality vs speed):**
+* Prioritize deployability and operational safety first (Hugging Face Docker Space + env-secret workflow), then incrementally polish UX.
+* Keep API contract stable and avoid large architecture changes while hardening deployment/security paths.
+
 * **UI and Onboarding:**
 * Polish the Chainlit experience with step-level agent visibility.
 * Implement the cold-start flow (public demo quota, then auth and key flow).
@@ -114,6 +120,20 @@ This roadmap is organized to deliver visible user results early, then incrementa
 * **Deployment:**
 * Dockerize the app and deploy to HuggingFace Spaces.
 * Add basic monitoring and operational runbooks.
+
+* **Phase 5 implementation plan (current):**
+* **Step A (Spaces deployment baseline):** Add Dockerfile + Spaces metadata + startup timeout and app port alignment for Hugging Face Docker Spaces.
+* **Step B (runtime secrets):** Standardize Secrets/Variables usage for `real_connectors` deployment and remove repo-coupled secret assumptions.
+* **Step C (stateless key handling):** Support request-scoped Gemini key override for API and ephemeral session key override for Chainlit.
+* **Step D (operational runbook):** Document Space secrets/variables, health checks, and push/deploy workflow.
+* **Step E (hardening pass):** Keep full tests green and preserve fallback behavior when connectors or keys are missing.
+
+* **Phase 5 acceptance criteria (increment 1):**
+* App runs on Hugging Face Docker Space with `app_port: 7860`.
+* Production secrets are configured through Space settings, not committed files.
+* API supports per-request runtime key override without server-side persistence.
+* Chainlit supports session-level runtime key override without disk persistence.
+* Full regression suite remains green.
 
 ## Milestone Summary
 

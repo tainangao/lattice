@@ -1,0 +1,15 @@
+.git
+.github
+.opencode
+.tmp
+.venv
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+.env
+.env.*
+tests
+Docs/Agentic_RAG_Architecture
