@@ -7,7 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 from time import perf_counter
 
+from scripts.regression._env import load_dotenv_file
+
 from lattice.prototype.config import AppConfig, load_config
+from lattice.prototype.retrievers.graph_retriever import (
+    Neo4jGraphRagRetriever,
+    Neo4jGraphRetriever,
+)
 from lattice.prototype.service import PrototypeService
 
 
@@ -44,6 +50,7 @@ async def _run_mode(
 ) -> dict[str, object]:
     config = _build_mode_config(base_config, mode_name)
     service = PrototypeService(config)
+    active_graph_backend = _resolve_graph_backend(mode_name, service)
 
     rows: list[dict[str, object]] = []
     for query in queries:
@@ -55,6 +62,7 @@ async def _run_mode(
             {
                 "query": query,
                 "route_mode": response.route.mode.value,
+                "graph_backend": active_graph_backend,
                 "latency_ms": round(elapsed_ms, 2),
                 "snippet_count": len(snippets),
                 "snippet_sources": [snippet.source_id for snippet in snippets],
@@ -62,7 +70,26 @@ async def _run_mode(
             }
         )
 
-    return {"mode": mode_name, "results": rows}
+    return {
+        "mode": mode_name,
+        "active_graph_backend": active_graph_backend,
+        "results": rows,
+    }
+
+
+def _resolve_graph_backend(mode_name: str, service: PrototypeService) -> str:
+    retriever = getattr(service, "_graph_retriever", None)
+    if isinstance(retriever, Neo4jGraphRagRetriever):
+        if mode_name == "hybrid_cypher":
+            return "graphrag_hybrid_cypher"
+        return "graphrag_hybrid"
+    if isinstance(retriever, Neo4jGraphRetriever):
+        if mode_name == "cypher":
+            return "cypher"
+        return f"cypher_fallback_from_{mode_name}"
+    if retriever is None:
+        return "no_graph_retriever"
+    return f"unknown:{retriever.__class__.__name__}"
 
 
 async def _main_async(query_file: Path, output_file: Path) -> None:
@@ -86,6 +113,7 @@ async def _main_async(query_file: Path, output_file: Path) -> None:
 
 
 def main() -> None:
+    load_dotenv_file()
     parser = argparse.ArgumentParser(
         description="Compare Cypher vs GraphRAG retriever modes"
     )

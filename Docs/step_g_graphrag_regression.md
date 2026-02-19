@@ -20,6 +20,8 @@ This artifact compares graph retrieval behavior across three modes:
 python scripts/regression/compare_graphrag_retrievers.py
 ```
 
+The regression scripts auto-load local `.env` values when present.
+
 Optional flags:
 
 ```bash
@@ -32,6 +34,7 @@ python scripts/regression/compare_graphrag_retrievers.py \
 
 The script writes JSON output containing, per mode and query:
 
+- active graph backend signal
 - route mode
 - latency in ms
 - snippet count
@@ -39,3 +42,11 @@ The script writes JSON output containing, per mode and query:
 - snippet scores
 
 Use this output to compare retrieval relevance and latency across baseline and GraphRAG modes during Step G rollout.
+
+Backend signal values:
+
+- `cypher`
+- `graphrag_hybrid`
+- `graphrag_hybrid_cypher`
+- `cypher_fallback_from_hybrid`
+- `cypher_fallback_from_hybrid_cypher`
