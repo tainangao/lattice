@@ -55,11 +55,20 @@ class PrototypeService:
             seed_graph_retriever=self._seed_graph_retriever,
             allow_seeded_fallback=config.allow_seeded_fallback,
             gemini_api_key=config.gemini_api_key,
+            phase4_enable_critic=config.phase4_enable_critic,
+            phase4_confidence_threshold=config.phase4_confidence_threshold,
+            phase4_min_snippets=config.phase4_min_snippets,
+            phase4_max_refinement_rounds=config.phase4_max_refinement_rounds,
+            phase4_refinement_retrieval_limit=config.phase4_refinement_retrieval_limit,
         )
 
     async def run_query(self, question: str) -> QueryResponse:
         request_id = uuid4().hex
-        state = create_initial_state(question, request_id=request_id)
+        state = create_initial_state(
+            question,
+            request_id=request_id,
+            retrieval_limit=self._config.phase4_initial_retrieval_limit,
+        )
         result_state = await self._orchestration_graph.ainvoke(
             state,
             config=build_graph_invoke_config(request_id),

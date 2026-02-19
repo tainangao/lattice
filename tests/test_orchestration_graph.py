@@ -34,6 +34,11 @@ async def test_orchestration_graph_direct_path_sets_direct_mode() -> None:
         seed_graph_retriever=empty,
         allow_seeded_fallback=True,
         gemini_api_key=None,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.62,
+        phase4_min_snippets=2,
+        phase4_max_refinement_rounds=1,
+        phase4_refinement_retrieval_limit=5,
     )
 
     result = await graph.ainvoke(create_initial_state("hello"))
@@ -72,6 +77,11 @@ async def test_orchestration_graph_both_path_runs_fan_in() -> None:
         seed_graph_retriever=graph,
         allow_seeded_fallback=True,
         gemini_api_key=None,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.62,
+        phase4_min_snippets=2,
+        phase4_max_refinement_rounds=1,
+        phase4_refinement_retrieval_limit=5,
     )
 
     result = await orchestration.ainvoke(
@@ -122,6 +132,11 @@ async def test_orchestration_graph_branch_failure_uses_seeded_fallback() -> None
         seed_graph_retriever=graph_seed,
         allow_seeded_fallback=True,
         gemini_api_key=None,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.62,
+        phase4_min_snippets=2,
+        phase4_max_refinement_rounds=1,
+        phase4_refinement_retrieval_limit=5,
     )
 
     result = await orchestration.ainvoke(
@@ -160,6 +175,11 @@ async def test_orchestration_graph_branch_failure_without_fallback_keeps_other_b
         seed_graph_retriever=empty_graph_seed,
         allow_seeded_fallback=False,
         gemini_api_key=None,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.62,
+        phase4_min_snippets=2,
+        phase4_max_refinement_rounds=1,
+        phase4_refinement_retrieval_limit=5,
     )
 
     result = await orchestration.ainvoke(
@@ -194,3 +214,63 @@ def _event(result: dict[str, object], event_name: str) -> dict[str, object]:
         if isinstance(event, dict) and event.get("event") == event_name:
             return event
     return {}
+
+
+class _AdaptiveRetriever:
+    def __init__(self) -> None:
+        self.limits: list[int] = []
+
+    async def retrieve(self, question: str, limit: int = 3) -> list[SourceSnippet]:
+        _ = question
+        self.limits.append(limit)
+        if limit <= 3:
+            return [
+                SourceSnippet(
+                    source_type="document",
+                    source_id="doc#low",
+                    text="Low confidence snippet.",
+                    score=0.2,
+                )
+            ]
+        return [
+            SourceSnippet(
+                source_type="document",
+                source_id="doc#high-1",
+                text="High confidence snippet one.",
+                score=0.95,
+            ),
+            SourceSnippet(
+                source_type="document",
+                source_id="doc#high-2",
+                text="High confidence snippet two.",
+                score=0.92,
+            ),
+        ]
+
+
+@pytest.mark.asyncio
+async def test_orchestration_graph_critic_refines_once_then_finalizes() -> None:
+    adaptive = _AdaptiveRetriever()
+    empty_graph = _FakeRetriever([])
+    orchestration = build_orchestration_graph(
+        document_retriever=adaptive,
+        graph_retriever=empty_graph,
+        seed_document_retriever=adaptive,
+        seed_graph_retriever=empty_graph,
+        allow_seeded_fallback=True,
+        gemini_api_key=None,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.62,
+        phase4_min_snippets=2,
+        phase4_max_refinement_rounds=1,
+        phase4_refinement_retrieval_limit=5,
+    )
+
+    result = await orchestration.ainvoke(
+        create_initial_state("Provide schedule evidence from documents.")
+    )
+
+    assert adaptive.limits == [3, 5]
+    assert result.get("critic_needs_refinement") is False
+    assert result.get("refinement_attempt") == 1
+    assert _event(result, "refinement_started")

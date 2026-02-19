@@ -28,6 +28,12 @@ class AppConfig:
     neo4j_graphrag_hybrid_cypher_query: str | None
     supabase_documents_table: str
     neo4j_scan_limit: int
+    phase4_enable_critic: bool
+    phase4_confidence_threshold: float
+    phase4_min_snippets: int
+    phase4_max_refinement_rounds: int
+    phase4_initial_retrieval_limit: int
+    phase4_refinement_retrieval_limit: int
     prototype_docs_path: str
     prototype_graph_path: str
 
@@ -61,6 +67,21 @@ def _read_int_env(name: str, default: int) -> int:
     except ValueError:
         return default
     return parsed if parsed > 0 else default
+
+
+def _read_float_env(name: str, default: float) -> float:
+    value = _read_optional_env(name)
+    if value is None:
+        return default
+    try:
+        parsed = float(value)
+    except ValueError:
+        return default
+    if parsed < 0:
+        return default
+    if parsed > 1:
+        return 1.0
+    return parsed
 
 
 def load_config() -> AppConfig:
@@ -108,6 +129,20 @@ def load_config() -> AppConfig:
         ),
         supabase_documents_table=os.getenv("SUPABASE_DOCUMENTS_TABLE", "embeddings"),
         neo4j_scan_limit=_read_int_env("NEO4J_SCAN_LIMIT", default=200),
+        phase4_enable_critic=_read_bool_env("PHASE4_ENABLE_CRITIC", default=True),
+        phase4_confidence_threshold=_read_float_env(
+            "PHASE4_CONFIDENCE_THRESHOLD", default=0.62
+        ),
+        phase4_min_snippets=_read_int_env("PHASE4_MIN_SNIPPETS", default=2),
+        phase4_max_refinement_rounds=_read_int_env(
+            "PHASE4_MAX_REFINEMENT_ROUNDS", default=1
+        ),
+        phase4_initial_retrieval_limit=_read_int_env(
+            "PHASE4_INITIAL_RETRIEVAL_LIMIT", default=3
+        ),
+        phase4_refinement_retrieval_limit=_read_int_env(
+            "PHASE4_REFINEMENT_RETRIEVAL_LIMIT", default=5
+        ),
         prototype_docs_path=os.getenv(
             "PROTOTYPE_DOCS_PATH", "data/prototype/private_documents.json"
         ),

@@ -28,6 +28,12 @@ def _test_config(**overrides: object) -> AppConfig:
         neo4j_graphrag_hybrid_cypher_query=None,
         supabase_documents_table="embeddings",
         neo4j_scan_limit=200,
+        phase4_enable_critic=True,
+        phase4_confidence_threshold=0.62,
+        phase4_min_snippets=2,
+        phase4_max_refinement_rounds=1,
+        phase4_initial_retrieval_limit=3,
+        phase4_refinement_retrieval_limit=5,
         prototype_docs_path="data/prototype/private_documents.json",
         prototype_graph_path="data/prototype/graph_edges.json",
     )

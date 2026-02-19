@@ -6,6 +6,7 @@ from typing import Protocol, TypedDict
 
 from lattice.prototype.models import RetrievalMode
 from lattice.prototype.models import SourceSnippet
+from lattice.prototype.orchestration.critic import assess_retrieval_quality
 from lattice.prototype.retrievers.merge import rank_and_trim_snippets
 from lattice.prototype.router_agent import route_question
 from lattice.prototype.synthesizer import synthesize_answer
@@ -127,6 +128,7 @@ def make_document_retrieval_node(
             return {"document_snippets": []}
 
         question = state.get("question", "")
+        limit = _resolve_retrieval_limit(state)
         started = perf_counter()
         outcome = await _run_retriever_with_fallback(
             question=question,
@@ -134,6 +136,7 @@ def make_document_retrieval_node(
             fallback_retriever=fallback_retriever,
             allow_seeded_fallback=allow_seeded_fallback,
             retriever_name="document",
+            limit=limit,
         )
         return {
             "document_snippets": outcome["snippets"],
@@ -144,6 +147,7 @@ def make_document_retrieval_node(
                     "fallback_used": outcome["fallback_used"],
                     "error_class": outcome["error_class"],
                     "retriever_mode": outcome["retriever_mode"],
+                    "limit": limit,
                     "duration_ms": _duration_ms(started),
                 }
             ],
@@ -163,6 +167,7 @@ def make_graph_retrieval_node(
             return {"graph_snippets": []}
 
         question = state.get("question", "")
+        limit = _resolve_retrieval_limit(state)
         started = perf_counter()
         outcome = await _run_retriever_with_fallback(
             question=question,
@@ -170,6 +175,7 @@ def make_graph_retrieval_node(
             fallback_retriever=fallback_retriever,
             allow_seeded_fallback=allow_seeded_fallback,
             retriever_name="graph",
+            limit=limit,
         )
         return {
             "graph_snippets": outcome["snippets"],
@@ -180,6 +186,7 @@ def make_graph_retrieval_node(
                     "fallback_used": outcome["fallback_used"],
                     "error_class": outcome["error_class"],
                     "retriever_mode": outcome["retriever_mode"],
+                    "limit": limit,
                     "duration_ms": _duration_ms(started),
                 }
             ],
@@ -220,15 +227,88 @@ def make_synthesize_node(gemini_api_key: str | None):
     return _node
 
 
+def make_critic_node(
+    confidence_threshold: float,
+    min_snippets: int,
+    max_refinement_rounds: int,
+    enable_critic: bool,
+):
+    def _node(state: OrchestrationState) -> OrchestrationState:
+        if not enable_critic:
+            return {
+                "critic_confidence": 1.0,
+                "critic_needs_refinement": False,
+                "critic_reason_codes": ["critic_disabled"],
+                "telemetry_events": [
+                    {
+                        "event": "critic_completed",
+                        "confidence": 1.0,
+                        "needs_refinement": False,
+                        "reason_codes": ["critic_disabled"],
+                    }
+                ],
+            }
+
+        assessment = assess_retrieval_quality(
+            route_mode=state.get("route_mode"),
+            snippets=state.get("snippets", []),
+            answer=state.get("answer", "") or "",
+            confidence_threshold=confidence_threshold,
+            min_snippets=min_snippets,
+            refinement_attempt=state.get("refinement_attempt", 0),
+            max_refinement_rounds=max_refinement_rounds,
+        )
+        return {
+            "critic_confidence": assessment.confidence,
+            "critic_needs_refinement": assessment.needs_refinement,
+            "critic_reason_codes": assessment.reason_codes,
+            "telemetry_events": [
+                {
+                    "event": "critic_completed",
+                    "confidence": assessment.confidence,
+                    "needs_refinement": assessment.needs_refinement,
+                    "reason_codes": assessment.reason_codes,
+                    "attempt": state.get("refinement_attempt", 0),
+                }
+            ],
+        }
+
+    return _node
+
+
+def make_refinement_node(refinement_retrieval_limit: int):
+    def _node(state: OrchestrationState) -> OrchestrationState:
+        current_attempt = state.get("refinement_attempt", 0)
+        next_attempt = current_attempt + 1
+        next_limit = max(
+            refinement_retrieval_limit, state.get("retrieval_limit", 3) + 1
+        )
+        return {
+            "refinement_attempt": next_attempt,
+            "retrieval_limit": next_limit,
+            "telemetry_events": [
+                {
+                    "event": "refinement_started",
+                    "attempt": next_attempt,
+                    "retrieval_limit": next_limit,
+                    "reason_codes": state.get("critic_reason_codes", []),
+                }
+            ],
+        }
+
+    return _node
+
+
 async def _run_retriever_with_fallback(
     question: str,
     primary_retriever: Retriever | None,
     fallback_retriever: Retriever,
     allow_seeded_fallback: bool,
     retriever_name: str,
+    limit: int,
 ) -> RetrieverOutcome:
     if primary_retriever is None:
-        snippets = await fallback_retriever.retrieve(question)
+        snippets = await fallback_retriever.retrieve(question, limit=limit)
         return {
             "snippets": snippets,
             "fallback_used": False,
@@ -237,7 +317,7 @@ async def _run_retriever_with_fallback(
         }
 
     try:
-        snippets = await primary_retriever.retrieve(question)
+        snippets = await primary_retriever.retrieve(question, limit=limit)
         return {
             "snippets": snippets,
             "fallback_used": False,
@@ -252,7 +332,7 @@ async def _run_retriever_with_fallback(
         )
         error_class = exc.__class__.__name__
         if allow_seeded_fallback:
-            snippets = await fallback_retriever.retrieve(question)
+            snippets = await fallback_retriever.retrieve(question, limit=limit)
             return {
                 "snippets": snippets,
                 "fallback_used": True,
@@ -284,3 +364,10 @@ def _build_retriever_error_snippet(
 
 def _duration_ms(started: float) -> int:
     return int((perf_counter() - started) * 1000)
+
+
+def _resolve_retrieval_limit(state: OrchestrationState) -> int:
+    value = state.get("retrieval_limit", 3)
+    if isinstance(value, int) and value > 0:
+        return value
+    return 3
