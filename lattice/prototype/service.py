@@ -6,6 +6,10 @@ from typing import Protocol
 
 from lattice.prototype.config import AppConfig, select_supabase_retrieval_key
 from lattice.prototype.models import QueryResponse, RetrievalMode, SourceSnippet
+from lattice.prototype.orchestration import (
+    build_orchestration_graph,
+    create_initial_state,
+)
 from lattice.prototype.retrievers.document_retriever import (
     SeedDocumentRetriever,
     SupabaseDocumentRetriever,
@@ -33,15 +37,18 @@ class PrototypeService:
         self._seed_graph_retriever = SeedGraphRetriever(config.prototype_graph_path)
         self._document_retriever = _build_document_retriever(config)
         self._graph_retriever = _build_graph_retriever(config)
+        self._orchestration_graph = build_orchestration_graph()
 
     async def run_query(self, question: str) -> QueryResponse:
         route = route_question(question)
         if route.mode == RetrievalMode.DIRECT:
+            state = create_initial_state(question)
+            result_state = self._orchestration_graph.invoke(state)
             return QueryResponse(
                 question=question,
                 route=route,
-                answer="Hello! Ask me about project timelines, dependencies, or document context.",
-                snippets=[],
+                answer=_direct_answer_from_state(result_state),
+                snippets=result_state.get("snippets", []),
             )
 
         snippets = await _retrieve_snippets(
@@ -174,6 +181,13 @@ def _dedupe_snippets(snippets: list[SourceSnippet]) -> list[SourceSnippet]:
         seen.add(dedupe_key)
         unique_snippets.append(snippet)
     return unique_snippets
+
+
+def _direct_answer_from_state(state: dict[str, object]) -> str:
+    answer = state.get("answer")
+    if isinstance(answer, str) and answer.strip():
+        return answer
+    return "Hello! Ask me about project timelines, dependencies, or document context."
 
 
 def _build_document_retriever(config: AppConfig) -> Retriever | None:

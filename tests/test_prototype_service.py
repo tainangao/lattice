@@ -43,6 +43,17 @@ async def test_run_query_returns_sources_for_hybrid_query() -> None:
     assert "Sources:" in response.answer
 
 
+@pytest.mark.asyncio
+async def test_run_query_direct_path_uses_direct_response_contract() -> None:
+    service = PrototypeService(_test_config())
+
+    response = await service.run_query("hello")
+
+    assert response.route.mode == RetrievalMode.DIRECT
+    assert response.snippets == []
+    assert "Hello!" in response.answer
+
+
 class _FakeRetriever:
     def __init__(
         self, snippets: list[SourceSnippet], should_raise: bool = False
