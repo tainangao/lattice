@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import FastAPI, Header
+from fastapi.responses import RedirectResponse
 from fastapi.responses import JSONResponse
 
 from lattice.prototype.config import load_config, with_runtime_gemini_key
@@ -11,6 +12,11 @@ from lattice.prototype.models import QueryRequest
 from lattice.prototype.service import PrototypeService
 
 app = FastAPI(title="Lattice Phase 1 Prototype", version="0.1.0")
+
+
+@app.get("/")
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs", status_code=307)
 
 
 @app.get("/health")
