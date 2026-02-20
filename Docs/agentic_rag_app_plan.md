@@ -7,7 +7,7 @@ This document outlines the design for an agentic RAG application tailored for co
 **Key Architectural Shift:**
 
 * **Frontend:** Switched from Streamlit to **Chainlit** to support native async streaming and "Chain of Thought" visualization.
-* **Graph Engine:** Adopting `neo4j-graphrag` for standardized hybrid retrieval.
+* **Graph Engine:** Neo4j graph retrieval remains active via the current Cypher-based retriever path; `neo4j-graphrag` is paused and kept experimental behind flags.
 * **Orchestration:** LangGraph with parallel execution (Fan-out/Fan-in) to reduce latency.
 
 ---
@@ -19,7 +19,7 @@ This document outlines the design for an agentic RAG application tailored for co
 * **Database (Relational & Vector):** Supabase (PostgreSQL + pgvector)
 * **Database (Graph):** Neo4j (AuraDB)
 * **LLM & Embeddings:** Google Gemini (via AI Studio)
-* **Graph SDK:** `neo4j-graphrag` (Python package)
+* **Graph SDK (Experimental):** `neo4j-graphrag` (paused for Phase 3 closeout; retained behind config flags only)
 
 ---
 
@@ -44,6 +44,16 @@ This plan follows a prototype-first delivery sequence so stakeholders can see re
 * Implement full LangGraph fan-out/fan-in state transitions.
 * Improve routing logic and retrieval quality.
 * Add telemetry for route and retrieval outcomes.
+* Keep `neo4j-graphrag` migration out of the critical path until provider/runtime prerequisites are met.
+
+### Phase 3 Status Note (Aligned with closeout plan)
+
+* **Core Phase 3 scope is closed:** orchestration, routing, telemetry, and regression stability are complete.
+* **GraphRAG adoption is on hold:** `neo4j-graphrag` remains deferred as a post-Phase-3 follow-up.
+* **Resume criteria for GraphRAG:**
+1. Stable embedding provider path is available in project runtime.
+2. Preflight reports `ready_for_graphrag=true`.
+3. Regression runs show live non-fallback backends (`graphrag_hybrid` and `graphrag_hybrid_cypher`).
 
 ### Phase 4: Critic, Feedback Loops, and Answer Quality
 
@@ -86,10 +96,10 @@ These processes run concurrently using Python `asyncio`, acting as specialized a
 * **Agent B: Graph Retriever (Neo4j)**
 * **Scope:** Shared organizational knowledge base.
 * **Role:** Extracts relationships, hierarchies, and connections (e.g., project dependencies or ownership mappings).
-* **Method:** Uses `neo4j-graphrag.HybridRetriever`.
-1. **Vector Search:** Finds entry nodes (e.g., "Project Alpha") using embeddings.
-2. **Graph Traversal:** Explores neighbors to identify risk factors or hidden links 2-hops out.
-3. **Cypher Fallback:** Generates raw Cypher for complex aggregation only.
+* **Method (current):** Uses the existing Cypher-based graph retrieval path for reliability in production.
+1. **Graph Retrieval:** Runs deterministic Cypher retrieval/ranking for graph-grounded snippets.
+2. **Traversal Logic:** Uses Cypher-level traversal/depth behavior for relationship discovery.
+3. **Experimental Modes (paused):** `neo4j-graphrag` (`HybridRetriever` / `HybridCypherRetriever`) remains config-gated and non-critical until resume criteria are satisfied.
 
 
 
