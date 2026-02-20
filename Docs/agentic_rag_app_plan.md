@@ -67,6 +67,14 @@ This plan follows a prototype-first delivery sequence so stakeholders can see re
 * Complete security hardening and stateless key handling.
 * Dockerize and deploy to HuggingFace Spaces.
 
+### Phase 6: Authenticated Private Knowledge Workflows
+
+* Implement Supabase Auth login/session flow for user-scoped actions.
+* Add end-to-end private file workflow: upload -> parse -> chunk -> embed -> store.
+* Enforce authenticated `user_id` assignment for private document ingestion and retrieval.
+* Connect Chainlit upload interactions to backend ingestion jobs with clear user feedback.
+* Preserve public demo mode while requiring auth for private file features.
+
 ---
 
 ## Core Agentic Architecture (LangGraph)

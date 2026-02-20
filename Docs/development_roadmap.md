@@ -176,6 +176,33 @@ This roadmap is organized to deliver visible user results early, then incrementa
 * [ ] Monitoring/runbook updated with `/ready` and operational thresholds.
 * [ ] Final regression pass (full suite) recorded with release notes.
 
+### Phase 6: Authenticated Private Knowledge Workflows
+
+**Goal:** Close core product gaps for authenticated private document workflows.
+
+**Status (2026-02-20):** Planned.
+
+* **Authentication and identity:**
+* Implement Supabase Auth login/session flow for Chainlit users.
+* Propagate authenticated identity to backend retrieval/ingestion paths.
+* Replace temporary service-role retrieval exceptions with user-auth retrieval where applicable.
+
+* **Private file pipeline (end-to-end):**
+* Implement runtime file upload handling from Chainlit to backend ingestion.
+* Add parser support for user-uploaded documents (PyMuPDF baseline), then chunk + embed + upsert.
+* Persist private rows with authenticated `user_id` and metadata for traceability.
+
+* **Retrieval and policy enforcement:**
+* Ensure private retrieval is user-scoped by auth identity and RLS policy boundaries.
+* Validate fallback behavior does not bypass user data boundaries.
+* Add explicit verification checklist for RLS effectiveness in deployed environments.
+
+* **Phase 6 acceptance criteria:**
+* Authenticated user can upload a private file in Chainlit and receive success/failure feedback.
+* Uploaded content is parsed, chunked, embedded, and persisted with correct `user_id`.
+* `/api/prototype/query` can retrieve the user's private snippets without cross-user leakage.
+* Regression tests cover upload, auth, user-scoped retrieval, and unauthorized access attempts.
+
 ## Milestone Summary
 
 1. **Prototype Demo Ready:** End-to-end answer flow in Chainlit.
@@ -184,6 +211,7 @@ This roadmap is organized to deliver visible user results early, then incrementa
    - `neo4j-graphrag` adoption remains deferred until provider/runtime prerequisites are stable.
 4. **Quality Layer Active:** Critic and feedback loops in production logic.
 5. **Production Launch:** Hardened UX, security, and deployment.
+6. **Authenticated Private Workflows:** Login, upload, embedding, and user-scoped retrieval are production-ready.
 
 ## Phase 5 Close-Out Note (Increment 1)
 
