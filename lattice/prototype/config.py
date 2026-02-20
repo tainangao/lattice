@@ -160,6 +160,14 @@ def select_supabase_retrieval_key(config: AppConfig) -> tuple[str | None, str | 
     return None, None
 
 
+def select_supabase_user_retrieval_key(
+    config: AppConfig,
+) -> tuple[str | None, str | None]:
+    if config.supabase_key:
+        return config.supabase_key, "SUPABASE_KEY"
+    return None, None
+
+
 def with_runtime_gemini_key(
     config: AppConfig,
     runtime_gemini_api_key: str | None,
@@ -170,3 +178,20 @@ def with_runtime_gemini_key(
     if not key:
         return config
     return replace(config, gemini_api_key=key)
+
+
+def normalize_runtime_user_id(runtime_user_id: object) -> str | None:
+    if not isinstance(runtime_user_id, str):
+        return None
+    normalized = runtime_user_id.strip()
+    return normalized if normalized else None
+
+
+def extract_bearer_token(authorization_header: str | None) -> str | None:
+    if not isinstance(authorization_header, str):
+        return None
+    prefix = "Bearer "
+    if not authorization_header.startswith(prefix):
+        return None
+    token = authorization_header[len(prefix) :].strip()
+    return token if token else None

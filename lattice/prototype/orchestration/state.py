@@ -9,6 +9,8 @@ from lattice.prototype.models import RetrievalMode, SourceSnippet
 class OrchestrationState(TypedDict, total=False):
     request_id: str
     question: str
+    runtime_user_id: str | None
+    runtime_access_token: str | None
     route_mode: RetrievalMode | None
     route_reason: str | None
     document_snippets: list[SourceSnippet]
@@ -28,10 +30,14 @@ def create_initial_state(
     question: str,
     request_id: str = "unknown",
     retrieval_limit: int = 3,
+    runtime_user_id: str | None = None,
+    runtime_access_token: str | None = None,
 ) -> OrchestrationState:
     return {
         "request_id": request_id,
         "question": question,
+        "runtime_user_id": runtime_user_id,
+        "runtime_access_token": runtime_access_token,
         "route_mode": None,
         "route_reason": None,
         "document_snippets": [],

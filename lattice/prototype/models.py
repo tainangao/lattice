@@ -33,3 +33,8 @@ class QueryResponse(BaseModel):
     route: RouteDecision
     answer: str
     snippets: list[SourceSnippet]
+
+
+class PrivateUploadRequest(BaseModel):
+    filename: str = Field(min_length=1)
+    content: str = Field(min_length=1)

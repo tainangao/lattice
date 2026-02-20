@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import chainlit as cl
 
-from lattice.prototype.config import load_config, with_runtime_gemini_key
+from lattice.prototype.config import (
+    load_config,
+    normalize_runtime_user_id,
+    with_runtime_gemini_key,
+)
 from lattice.prototype.service import PrototypeService
 
 
@@ -15,6 +20,10 @@ DEFAULT_PUBLIC_DEMO_QUERY_LIMIT = 3
 async def on_chat_start() -> None:
     demo_limit = _resolve_demo_query_limit(os.getenv("PUBLIC_DEMO_QUERY_LIMIT"))
     cl.user_session.set("demo_queries_used", 0)
+    cl.user_session.set(
+        "authenticated_user_id",
+        _resolve_authenticated_user_id(cl.user_session.get("user")),
+    )
     await cl.Message(content=_build_welcome_message(demo_limit)).send()
 
 
@@ -39,9 +48,53 @@ async def on_message(message: cl.Message) -> None:
         ).send()
         return
 
+    if _is_private_upload_command(command):
+        runtime_user_id = _resolve_authenticated_user_id(cl.user_session.get("user"))
+        if runtime_user_id is None:
+            await cl.Message(
+                content="Private upload requires login. Authenticate first, then retry `/upload`."
+            ).send()
+            return
+
+        files = await cl.AskFileMessage(
+            content="Upload one private text or markdown file.",
+            accept=["text/plain", "text/markdown"],
+            max_files=1,
+            max_size_mb=8,
+            timeout=120,
+        ).send()
+        if not files:
+            await cl.Message(content="No file received. Upload canceled.").send()
+            return
+
+        uploaded_file = files[0]
+        file_content = _read_uploaded_text(uploaded_file.path)
+        if not file_content:
+            await cl.Message(
+                content="Uploaded file has no readable text content."
+            ).send()
+            return
+
+        config = with_runtime_gemini_key(load_config(), None)
+        service = PrototypeService(config)
+        ingested_count = await service.ingest_private_document(
+            source=uploaded_file.name,
+            content=file_content,
+            runtime_user_id=runtime_user_id,
+        )
+        await cl.Message(
+            content=(
+                f"Private document ingested for `{runtime_user_id}` "
+                f"({ingested_count} chunks)."
+            )
+        ).send()
+        return
+
     demo_limit = _resolve_demo_query_limit(os.getenv("PUBLIC_DEMO_QUERY_LIMIT"))
     used_count = _resolve_demo_queries_used(cl.user_session.get("demo_queries_used"))
     has_session_key = _has_session_key(cl.user_session.get("gemini_api_key"))
+    runtime_user_id = _resolve_authenticated_user_id(cl.user_session.get("user"))
+    cl.user_session.set("authenticated_user_id", runtime_user_id)
 
     if _is_demo_quota_exhausted(
         has_session_key=has_session_key,
@@ -61,7 +114,10 @@ async def on_message(message: cl.Message) -> None:
 
     route_step = cl.Step(name="Router Agent", type="tool")
     await route_step.send()
-    result = await service.run_query(message.content)
+    result = await service.run_query(
+        message.content,
+        runtime_user_id=runtime_user_id,
+    )
     route_step.output = f"{result.route.mode.value}: {result.route.reason}"
     await route_step.update()
 
@@ -150,3 +206,28 @@ def _build_demo_footer(has_session_key: bool, remaining: int) -> str:
     if has_session_key:
         return "\n\nSession key mode: active (public demo quota not applied)."
     return f"\n\nPublic demo queries remaining in this session: {remaining}."
+
+
+def _is_private_upload_command(command: str) -> bool:
+    return command.lower() in {"/upload", "/upload-private"}
+
+
+def _read_uploaded_text(path: str) -> str:
+    file_path = Path(path)
+    if not file_path.exists():
+        return ""
+    return file_path.read_text(encoding="utf-8", errors="ignore").strip()
+
+
+def _resolve_authenticated_user_id(user: object) -> str | None:
+    if isinstance(user, dict):
+        return normalize_runtime_user_id(user.get("identifier"))
+
+    identifier = getattr(user, "identifier", None)
+    if isinstance(identifier, str):
+        return normalize_runtime_user_id(identifier)
+
+    if isinstance(user, str):
+        return normalize_runtime_user_id(user)
+
+    return None

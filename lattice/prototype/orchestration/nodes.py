@@ -17,7 +17,12 @@ LOGGER = logging.getLogger(__name__)
 
 
 class Retriever(Protocol):
-    async def retrieve(self, question: str, limit: int = 3) -> list[SourceSnippet]: ...
+    async def retrieve(
+        self,
+        question: str,
+        limit: int = 3,
+        runtime_user_id: str | None = None,
+    ) -> list[SourceSnippet]: ...
 
 
 class RetrieverOutcome(TypedDict):
@@ -166,10 +171,12 @@ def make_document_retrieval_node(
             return {"document_snippets": []}
 
         question = state.get("question", "")
+        runtime_user_id = _resolve_runtime_user_id(state)
         limit = _resolve_retrieval_limit(state)
         started = perf_counter()
         outcome = await _run_retriever_with_fallback(
             question=question,
+            runtime_user_id=runtime_user_id,
             primary_retriever=primary_retriever,
             fallback_retriever=fallback_retriever,
             allow_seeded_fallback=allow_seeded_fallback,
@@ -205,10 +212,12 @@ def make_graph_retrieval_node(
             return {"graph_snippets": []}
 
         question = state.get("question", "")
+        runtime_user_id = _resolve_runtime_user_id(state)
         limit = _resolve_retrieval_limit(state)
         started = perf_counter()
         outcome = await _run_retriever_with_fallback(
             question=question,
+            runtime_user_id=runtime_user_id,
             primary_retriever=primary_retriever,
             fallback_retriever=fallback_retriever,
             allow_seeded_fallback=allow_seeded_fallback,
@@ -339,6 +348,7 @@ def make_refinement_node(refinement_retrieval_limit: int):
 
 async def _run_retriever_with_fallback(
     question: str,
+    runtime_user_id: str | None,
     primary_retriever: Retriever | None,
     fallback_retriever: Retriever,
     allow_seeded_fallback: bool,
@@ -346,7 +356,11 @@ async def _run_retriever_with_fallback(
     limit: int,
 ) -> RetrieverOutcome:
     if primary_retriever is None:
-        snippets = await fallback_retriever.retrieve(question, limit=limit)
+        snippets = await fallback_retriever.retrieve(
+            question,
+            limit=limit,
+            runtime_user_id=runtime_user_id,
+        )
         return {
             "snippets": snippets,
             "fallback_used": False,
@@ -355,7 +369,11 @@ async def _run_retriever_with_fallback(
         }
 
     try:
-        snippets = await primary_retriever.retrieve(question, limit=limit)
+        snippets = await primary_retriever.retrieve(
+            question,
+            limit=limit,
+            runtime_user_id=runtime_user_id,
+        )
         return {
             "snippets": snippets,
             "fallback_used": False,
@@ -370,7 +388,11 @@ async def _run_retriever_with_fallback(
         )
         error_class = exc.__class__.__name__
         if allow_seeded_fallback:
-            snippets = await fallback_retriever.retrieve(question, limit=limit)
+            snippets = await fallback_retriever.retrieve(
+                question,
+                limit=limit,
+                runtime_user_id=runtime_user_id,
+            )
             return {
                 "snippets": snippets,
                 "fallback_used": True,
@@ -409,6 +431,13 @@ def _resolve_retrieval_limit(state: OrchestrationState) -> int:
     if isinstance(value, int) and value > 0:
         return value
     return 3
+
+
+def _resolve_runtime_user_id(state: OrchestrationState) -> str | None:
+    value = state.get("runtime_user_id")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
 def _resolve_confidence(state: OrchestrationState) -> float:

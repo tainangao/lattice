@@ -18,7 +18,13 @@ class SeedGraphRetriever:
     def __init__(self, graph_path: str) -> None:
         self._graph_path = graph_path
 
-    async def retrieve(self, question: str, limit: int = 3) -> list[SourceSnippet]:
+    async def retrieve(
+        self,
+        question: str,
+        limit: int = 3,
+        runtime_user_id: str | None = None,
+    ) -> list[SourceSnippet]:
+        _ = runtime_user_id
         edges = _load_graph_edges(self._graph_path)
         ranked = sorted(
             edges,
@@ -52,7 +58,13 @@ class Neo4jGraphRetriever:
         self._scan_limit = scan_limit
         self._driver = GraphDatabase.driver(uri, auth=(username, password))
 
-    async def retrieve(self, question: str, limit: int = 3) -> list[SourceSnippet]:
+    async def retrieve(
+        self,
+        question: str,
+        limit: int = 3,
+        runtime_user_id: str | None = None,
+    ) -> list[SourceSnippet]:
+        _ = runtime_user_id
         return await asyncio.to_thread(self._retrieve_sync, question, limit)
 
     def _retrieve_sync(self, question: str, limit: int) -> list[SourceSnippet]:
@@ -219,7 +231,13 @@ class Neo4jGraphRagRetriever:
                 neo4j_database=database,
             )
 
-    async def retrieve(self, question: str, limit: int = 3) -> list[SourceSnippet]:
+    async def retrieve(
+        self,
+        question: str,
+        limit: int = 3,
+        runtime_user_id: str | None = None,
+    ) -> list[SourceSnippet]:
+        _ = runtime_user_id
         return await asyncio.to_thread(self._retrieve_sync, question, limit)
 
     def _retrieve_sync(self, question: str, limit: int) -> list[SourceSnippet]:

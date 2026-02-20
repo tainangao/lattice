@@ -15,8 +15,29 @@ create table if not exists public.embeddings (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
-create unique index if not exists embeddings_source_chunk_id_idx
-  on public.embeddings (source, chunk_id);
+-- Incremental migration safety for existing tables:
+-- 1) ensure user_id exists,
+-- 2) backfill from metadata.user_id when available,
+-- 3) remove legacy null-user rows,
+-- 4) enforce NOT NULL.
+alter table if exists public.embeddings
+  add column if not exists user_id uuid;
+
+update public.embeddings
+set user_id = (metadata->>'user_id')::uuid
+where user_id is null
+  and metadata ? 'user_id'
+  and metadata->>'user_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
+
+delete from public.embeddings
+where user_id is null;
+
+alter table if exists public.embeddings
+  alter column user_id set not null;
+
+drop index if exists embeddings_source_chunk_id_idx;
+create unique index if not exists embeddings_user_source_chunk_id_idx
+  on public.embeddings (user_id, source, chunk_id);
 
 create index if not exists embeddings_user_id_idx
   on public.embeddings (user_id);
@@ -39,8 +60,8 @@ create policy "embeddings_select_own"
   for select
   to authenticated
   using (
-    user_id is null
-    or user_id = auth.uid()
+    auth.uid() is not null
+    and user_id = auth.uid()
   );
 
 drop policy if exists "embeddings_insert_own" on public.embeddings;
@@ -49,8 +70,8 @@ create policy "embeddings_insert_own"
   for insert
   to authenticated
   with check (
-    user_id is null
-    or user_id = auth.uid()
+    auth.uid() is not null
+    and user_id = auth.uid()
   );
 
 drop policy if exists "embeddings_update_own" on public.embeddings;
@@ -59,12 +80,22 @@ create policy "embeddings_update_own"
   for update
   to authenticated
   using (
-    user_id is null
-    or user_id = auth.uid()
+    auth.uid() is not null
+    and user_id = auth.uid()
   )
   with check (
-    user_id is null
-    or user_id = auth.uid()
+    auth.uid() is not null
+    and user_id = auth.uid()
+  );
+
+drop policy if exists "embeddings_delete_own" on public.embeddings;
+create policy "embeddings_delete_own"
+  on public.embeddings
+  for delete
+  to authenticated
+  using (
+    auth.uid() is not null
+    and user_id = auth.uid()
   );
 
 -- Keep updated_at current on updates.

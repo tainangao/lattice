@@ -5,7 +5,7 @@ import logging
 from uuid import uuid4
 from typing import Protocol
 
-from lattice.prototype.config import AppConfig, select_supabase_retrieval_key
+from lattice.prototype.config import AppConfig, select_supabase_user_retrieval_key
 from lattice.prototype.models import (
     QueryResponse,
     RetrievalMode,
@@ -62,12 +62,35 @@ class PrototypeService:
             phase4_refinement_retrieval_limit=config.phase4_refinement_retrieval_limit,
         )
 
-    async def run_query(self, question: str) -> QueryResponse:
+    async def ingest_private_document(
+        self,
+        source: str,
+        content: str,
+        runtime_user_id: str | None,
+    ) -> int:
+        if not runtime_user_id:
+            raise ValueError("Private ingestion requires authenticated user identity.")
+        if not isinstance(self._document_retriever, SupabaseDocumentRetriever):
+            raise RuntimeError("Supabase document retriever is not available.")
+        return await self._document_retriever.upsert_private_document(
+            user_id=runtime_user_id,
+            source=source,
+            content=content,
+        )
+
+    async def run_query_with_context(
+        self,
+        question: str,
+        runtime_user_id: str | None = None,
+        runtime_access_token: str | None = None,
+    ) -> QueryResponse:
         request_id = uuid4().hex
         state = create_initial_state(
             question,
             request_id=request_id,
             retrieval_limit=self._config.phase4_initial_retrieval_limit,
+            runtime_user_id=runtime_user_id,
+            runtime_access_token=runtime_access_token,
         )
         result_state = await self._orchestration_graph.ainvoke(
             state,
@@ -79,6 +102,18 @@ class PrototypeService:
         answer = _answer_from_state(result_state, route.mode)
         return QueryResponse(
             question=question, route=route, answer=answer, snippets=snippets
+        )
+
+    async def run_query(
+        self,
+        question: str,
+        runtime_user_id: str | None = None,
+        runtime_access_token: str | None = None,
+    ) -> QueryResponse:
+        return await self.run_query_with_context(
+            question,
+            runtime_user_id=runtime_user_id,
+            runtime_access_token=runtime_access_token,
         )
 
 
@@ -210,7 +245,7 @@ def _route_from_state(state: dict[str, object]) -> RouteDecision:
 def _build_document_retriever(config: AppConfig) -> Retriever | None:
     if not config.use_real_supabase:
         return None
-    supabase_key, _ = select_supabase_retrieval_key(config)
+    supabase_key, _ = select_supabase_user_retrieval_key(config)
     if not config.supabase_url or not supabase_key:
         return None
     return SupabaseDocumentRetriever(

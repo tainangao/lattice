@@ -4,6 +4,7 @@ import pytest
 
 from lattice.prototype.config import AppConfig
 from lattice.prototype.models import RetrievalMode, SourceSnippet
+from lattice.prototype.retrievers.document_retriever import SupabaseDocumentRetriever
 from lattice.prototype.retrievers.merge import rank_and_trim_snippets
 from lattice.prototype.service import (
     PrototypeService,
@@ -367,3 +368,104 @@ def test_build_graph_retriever_uses_hybrid_cypher_when_configured(
     assert retriever.label == "graphrag"
     assert calls["mode"] == "hybrid_cypher"
     assert calls["query"] == "RETURN node"
+
+
+@pytest.mark.asyncio
+async def test_private_ingestion_requires_authenticated_user() -> None:
+    service = PrototypeService(_test_config())
+
+    with pytest.raises(ValueError):
+        await service.ingest_private_document(
+            source="notes.txt",
+            content="private content",
+            runtime_user_id=None,
+        )
+
+
+@pytest.mark.asyncio
+async def test_private_ingestion_uses_user_scoped_retriever(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, str] = {}
+
+    class _FakeSupabaseRetriever(SupabaseDocumentRetriever):
+        def __init__(self) -> None:
+            return None
+
+        async def upsert_private_document(
+            self,
+            user_id: str,
+            source: str,
+            content: str,
+            chunk_size: int = 800,
+            overlap: int = 120,
+        ) -> int:
+            calls["user_id"] = user_id
+            calls["source"] = source
+            calls["content"] = content
+            return 3
+
+    monkeypatch.setattr(
+        "lattice.prototype.service._build_document_retriever",
+        lambda config: _FakeSupabaseRetriever(),
+    )
+
+    service = PrototypeService(
+        _test_config(
+            use_real_supabase=True,
+            supabase_url="https://example.supabase.co",
+            supabase_key="anon-key",
+        )
+    )
+
+    result = await service.ingest_private_document(
+        source="notes.txt",
+        content="private content",
+        runtime_user_id="user-123",
+    )
+
+    assert result == 3
+    assert calls["user_id"] == "user-123"
+    assert calls["source"] == "notes.txt"
+
+
+def test_query_candidate_rows_applies_runtime_user_filter() -> None:
+    class _FakeQuery:
+        def __init__(self) -> None:
+            self.eq_calls: list[tuple[str, str]] = []
+
+        def select(self, _: str) -> "_FakeQuery":
+            return self
+
+        def eq(self, field: str, value: str) -> "_FakeQuery":
+            self.eq_calls.append((field, value))
+            return self
+
+        def or_(self, _: str) -> "_FakeQuery":
+            return self
+
+        def limit(self, _: int) -> "_FakeQuery":
+            return self
+
+        def execute(self) -> object:
+            return object()
+
+    class _FakeClient:
+        def __init__(self, query: _FakeQuery) -> None:
+            self._query = query
+
+        def table(self, _: str) -> _FakeQuery:
+            return self._query
+
+    fake_query = _FakeQuery()
+    retriever = object.__new__(SupabaseDocumentRetriever)
+    retriever._table_name = "embeddings"
+    retriever._client = _FakeClient(fake_query)
+
+    _ = retriever._query_candidate_rows(
+        question="Show my private project timeline",
+        fetch_limit=10,
+        runtime_user_id="user-abc",
+    )
+
+    assert fake_query.eq_calls == [("user_id", "user-abc")]

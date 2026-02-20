@@ -59,6 +59,7 @@ def _rows_from_seed_documents(
     docs_path: Path,
     chunk_size: int,
     overlap: int,
+    user_id: str,
 ) -> list[dict[str, Any]]:
     raw = json.loads(docs_path.read_text(encoding="utf-8"))
     if not isinstance(raw, list):
@@ -80,11 +81,13 @@ def _rows_from_seed_documents(
             output_rows.append(
                 {
                     "id": _deterministic_id(source, derived_chunk_id),
+                    "user_id": user_id,
                     "source": source,
                     "chunk_id": derived_chunk_id,
                     "content": chunk_text,
                     "metadata": {
                         "seed_chunk_id": seed_chunk_id,
+                        "user_id": user_id,
                         "ingested_at": int(time.time()),
                     },
                 }
@@ -96,6 +99,7 @@ def main() -> int:
     supabase_url = _env("SUPABASE_URL")
     supabase_key = _env("SUPABASE_SERVICE_ROLE_KEY")
     table = os.getenv("SUPABASE_DOCUMENTS_TABLE", "embeddings")
+    ingest_user_id = _env("INGEST_USER_ID")
     docs_path = Path(
         os.getenv("PROTOTYPE_DOCS_PATH", "data/prototype/private_documents.json")
     )
@@ -105,7 +109,12 @@ def main() -> int:
     if not docs_path.exists():
         raise FileNotFoundError(f"Document seed file not found: {docs_path}")
 
-    rows = _rows_from_seed_documents(docs_path, chunk_size=chunk_size, overlap=overlap)
+    rows = _rows_from_seed_documents(
+        docs_path,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        user_id=ingest_user_id,
+    )
     if not rows:
         print("No document rows to ingest.")
         return 0
