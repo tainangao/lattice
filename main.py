@@ -6,10 +6,9 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.responses import JSONResponse
 
+from lattice.prototype.auth import AuthVerificationError, verify_supabase_bearer_token
 from lattice.prototype.config import (
-    extract_bearer_token,
     load_config,
-    normalize_runtime_user_id,
     with_runtime_gemini_key,
 )
 from lattice.prototype.data_health import build_data_health_report
@@ -50,16 +49,20 @@ async def query_prototype(
     payload: QueryRequest,
     x_gemini_api_key: str | None = Header(default=None, alias="X-Gemini-Api-Key"),
     authorization: str | None = Header(default=None, alias="Authorization"),
-    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 ) -> JSONResponse:
-    runtime_access_token = extract_bearer_token(authorization)
-    runtime_user_id = normalize_runtime_user_id(x_user_id)
     config = with_runtime_gemini_key(load_config(), x_gemini_api_key)
+    runtime_user_id: str | None = None
+    if authorization is not None:
+        try:
+            runtime_user_id = verify_supabase_bearer_token(authorization, config)
+        except AuthVerificationError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+
     service = PrototypeService(config)
     result = await service.run_query(
         payload.question,
         runtime_user_id=runtime_user_id,
-        runtime_access_token=runtime_access_token,
+        runtime_access_token=authorization,
     )
     return JSONResponse(content=result.model_dump())
 
@@ -68,16 +71,14 @@ async def query_prototype(
 async def upload_private_document(
     payload: PrivateUploadRequest,
     authorization: str | None = Header(default=None, alias="Authorization"),
-    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 ) -> JSONResponse:
-    runtime_access_token = extract_bearer_token(authorization)
-    runtime_user_id = normalize_runtime_user_id(x_user_id)
-    if runtime_access_token is None or runtime_user_id is None:
-        raise HTTPException(
-            status_code=401, detail="Authenticated user context required"
-        )
+    config = load_config()
+    try:
+        runtime_user_id = verify_supabase_bearer_token(authorization, config)
+    except AuthVerificationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
-    service = PrototypeService(load_config())
+    service = PrototypeService(config)
     ingested_count = await service.ingest_private_document(
         source=payload.filename,
         content=payload.content,
