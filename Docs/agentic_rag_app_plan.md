@@ -75,6 +75,37 @@ This plan follows a prototype-first delivery sequence so stakeholders can see re
 * Connect Chainlit upload interactions to backend ingestion jobs with clear user feedback.
 * Preserve public demo mode while requiring auth for private file features.
 
+#### Phase 6 Delivery Notes (Supabase Auth Free Tier)
+
+* Supabase Auth can run on the Free plan for this phase, with current quota limits.
+* Free-tier assumptions for planning:
+1. Keep MAU usage within the free monthly quota.
+2. Keep project count and storage footprint within free limits.
+3. Treat pricing and quota values as externally managed and subject to future changes.
+
+#### Phase 6 Implementation Checklist (Repo-Aligned)
+
+1. **Auth session bridge (Chainlit -> backend):**
+* Add login/session flow in Chainlit and pass user JWT to backend private endpoints.
+* Require valid user JWT for private upload/ingestion actions.
+
+2. **Upload entrypoint and ingestion trigger:**
+* Add upload handling in Chainlit message flow for private documents.
+* Add backend upload/ingestion endpoint(s) for authenticated users.
+
+3. **Parser + chunk + embedding pipeline:**
+* Parse uploaded files with PyMuPDF baseline.
+* Apply deterministic chunking and embedding generation for each chunk.
+* Upsert into Supabase `embeddings` with source metadata and `user_id`.
+
+4. **User-scoped retrieval + RLS alignment:**
+* Ensure retrieval uses user-scoped auth context (`auth.uid()` boundary).
+* Remove service-role retrieval paths from user-query runtime flows.
+
+5. **Validation and tests:**
+* Add tests for login-required upload, successful authenticated ingest, and unauthorized rejection.
+* Add tests for cross-user isolation in retrieval results.
+
 ---
 
 ## Core Agentic Architecture (LangGraph)

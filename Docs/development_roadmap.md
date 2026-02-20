@@ -182,6 +182,10 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 **Status (2026-02-20):** Planned.
 
+* **Supabase Auth cost posture (planning assumption):**
+* Phase 6 targets Supabase Free plan operation (no paid Auth dependency) while usage remains within current free quotas.
+* Monitor MAU/project/storage limits regularly and treat pricing/quota values as subject to change.
+
 * **Authentication and identity:**
 * Implement Supabase Auth login/session flow for Chainlit users.
 * Propagate authenticated identity to backend retrieval/ingestion paths.
@@ -202,6 +206,14 @@ This roadmap is organized to deliver visible user results early, then incrementa
 * Uploaded content is parsed, chunked, embedded, and persisted with correct `user_id`.
 * `/api/prototype/query` can retrieve the user's private snippets without cross-user leakage.
 * Regression tests cover upload, auth, user-scoped retrieval, and unauthorized access attempts.
+
+* **Phase 6 implementation checklist (repo targets):**
+* **Auth + session bridge:** add user login/session wiring in `lattice/chainlit_app.py` and pass JWT to backend private operations.
+* **Private upload path:** add authenticated upload/ingestion API route(s) in `main.py` and service wiring in `lattice/prototype/service.py`.
+* **Ingestion pipeline upgrade:** evolve `scripts/ingestion/ingest_private_documents.py` into runtime-capable parser/chunk/embed/upsert flow with `user_id`.
+* **Retriever scoping:** update `lattice/prototype/retrievers/document_retriever.py` to enforce user-scoped retrieval via auth context and RLS-safe key paths.
+* **Config hardening:** update `lattice/prototype/config.py` to separate user-runtime keys from admin-only service-role usage.
+* **Test coverage:** add tests for auth-required upload, per-user isolation, and unauthorized retrieval rejection.
 
 ## Milestone Summary
 
