@@ -42,6 +42,14 @@ uv run uvicorn main:app --reload
 - `GET /health`
 - `GET /ready`
 - `GET /api/v1/status`
+- `GET /api/v1/auth/session` (requires `Authorization: Bearer <supabase-jwt>`)
+
+## Auth Scaffold Environment
+
+- `SUPABASE_URL` (used to derive JWKS URL)
+- `SUPABASE_JWKS_URL` (optional explicit override)
+- `SUPABASE_JWT_AUDIENCE` (optional)
+- `SUPABASE_JWT_ISSUER` (optional override)
 
 ## Rebuild Source of Truth
 

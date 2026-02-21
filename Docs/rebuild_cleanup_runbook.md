@@ -44,6 +44,13 @@ git ls-remote --tags origin snapshot-pre-rebuild-2026-02-21
 
 ## Next Planned Pass
 
-1. Trim dependency set in `pyproject.toml` to v1 bootstrap minimum.
-2. Introduce initial Supabase Auth verification boundary for FR-1 scaffolding.
-3. Add v1 endpoint namespaces for auth, ingestion, retrieval, and query orchestration.
+1. Trim dependency set in `pyproject.toml` to v1 bootstrap minimum. (Done)
+2. Introduce initial Supabase Auth verification boundary for FR-1 scaffolding. (Done)
+3. Add v1 endpoint namespaces for auth, ingestion, retrieval, and query orchestration. (In progress)
+
+## FR-1 Scaffold Added
+
+- Added Supabase JWT verification module scaffold under `lattice/app/auth/`.
+- Added protected auth session endpoint: `GET /api/v1/auth/session`.
+- Added protected private probe endpoint: `GET /api/v1/private/ping`.
+- Added unit tests for unauthorized, verified, and auth-config-error paths.
