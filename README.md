@@ -80,4 +80,3 @@ uv run python scripts/eval/run_offline_eval.py
 ## Rebuild Source of Truth
 
 - Product requirements: `Docs/PRD.md`
-- Cleanup runbook: `Docs/rebuild_cleanup_runbook.md`
