@@ -29,10 +29,14 @@ from lattice.app.ingestion.service import (
     get_user_ingestion_job,
     list_user_ingestion_jobs,
 )
+from lattice.app.llm.providers import build_critic_model
 from lattice.app.memory.service import append_turn, get_recent_turns
 from lattice.app.observability.service import create_trace, tool_trace
 from lattice.app.orchestration.service import run_orchestration
-from lattice.app.retrieval.embeddings import build_embedding_provider
+from lattice.app.retrieval.embeddings import (
+    build_embedding_provider,
+    build_runtime_embedding_provider,
+)
 from lattice.app.retrieval.supabase_store import SupabaseVectorStore
 from lattice.app.runtime.store import runtime_store
 from lattice.core.config import AppConfig, load_app_config
@@ -275,13 +279,28 @@ def create_app() -> FastAPI:
                     detail="Demo quota reached. Sign in to continue with private features.",
                 )
 
+        runtime_key = runtime_store.runtime_keys_by_session.get(demo_session_id)
+        runtime_embedding_provider = build_runtime_embedding_provider(
+            dimensions=config.embedding_dimensions,
+            runtime_key=runtime_key,
+            model=config.gemini_embedding_model,
+            backend=config.embedding_backend,
+        )
+        critic_model = build_critic_model(
+            runtime_key=runtime_key,
+            backend=config.critic_backend,
+            model=config.critic_model,
+        )
+
         route_started = time.perf_counter()
         result = run_orchestration(
             store=runtime_store,
             question=payload.question,
             user_id=maybe_context.user_id if maybe_context else None,
             user_access_token=maybe_context.access_token if maybe_context else None,
-            embedding_provider=embedding_provider,
+            embedding_provider=runtime_embedding_provider,
+            critic_model=critic_model,
+            max_refinements=config.critic_max_refinements,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
             use_langgraph=config.enable_langgraph,
@@ -336,6 +355,13 @@ def create_app() -> FastAPI:
                         "latency_ms": routing_trace.latency_ms,
                         "status": routing_trace.status,
                     }
+                ],
+                "decisions": [
+                    {
+                        "tool_name": decision.tool_name,
+                        "rationale": decision.rationale,
+                    }
+                    for decision in result["tool_decisions"]
                 ],
             },
             "memory": [{"role": turn.role, "content": turn.content} for turn in turns],

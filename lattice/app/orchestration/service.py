@@ -5,7 +5,8 @@ from typing import Annotated, Literal
 from typing import TypedDict
 
 from lattice.app.graph.neo4j_store import Neo4jGraphStore
-from lattice.app.orchestration.contracts import RouteDecision
+from lattice.app.llm.providers import CriticModel
+from lattice.app.orchestration.contracts import RouteDecision, ToolDecision
 from lattice.app.response.contracts import AnswerEnvelope
 from lattice.app.response.service import build_answer
 from lattice.app.retrieval.contracts import RetrievalBundle, RetrievalHit
@@ -24,6 +25,7 @@ class OrchestrationResult(TypedDict):
     route_reason: str
     retrieval: RetrievalBundle
     answer: AnswerEnvelope
+    tool_decisions: tuple[ToolDecision, ...]
 
 
 class _GraphState(TypedDict, total=False):
@@ -86,6 +88,16 @@ def _run_without_langgraph(
         "route_reason": route_decision.reason,
         "retrieval": retrieval,
         "answer": answer,
+        "tool_decisions": (
+            ToolDecision(tool_name="router", rationale=route_decision.reason),
+            ToolDecision(
+                tool_name="retrieval", rationale=f"route={route_decision.path}"
+            ),
+            ToolDecision(
+                tool_name="synthesis",
+                rationale=f"confidence={answer.confidence}",
+            ),
+        ),
     }
 
 
@@ -96,12 +108,14 @@ def run_orchestration(
     user_id: str | None,
     user_access_token: str | None,
     embedding_provider: EmbeddingProvider,
+    critic_model: CriticModel,
+    max_refinements: int,
     supabase_store: SupabaseVectorStore | None,
     neo4j_store: Neo4jGraphStore | None,
     use_langgraph: bool,
 ) -> OrchestrationResult:
     if not use_langgraph:
-        return _run_without_langgraph(
+        initial = _run_without_langgraph(
             store=store,
             question=question,
             user_id=user_id,
@@ -110,16 +124,40 @@ def run_orchestration(
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
         )
+        return _maybe_refine(
+            question=question,
+            initial=initial,
+            store=store,
+            user_id=user_id,
+            user_access_token=user_access_token,
+            embedding_provider=embedding_provider,
+            critic_model=critic_model,
+            max_refinements=max_refinements,
+            supabase_store=supabase_store,
+            neo4j_store=neo4j_store,
+        )
 
     try:
         from langgraph.graph import END, START, StateGraph
     except Exception:
-        return _run_without_langgraph(
+        initial = _run_without_langgraph(
             store=store,
             question=question,
             user_id=user_id,
             user_access_token=user_access_token,
             embedding_provider=embedding_provider,
+            supabase_store=supabase_store,
+            neo4j_store=neo4j_store,
+        )
+        return _maybe_refine(
+            question=question,
+            initial=initial,
+            store=store,
+            user_id=user_id,
+            user_access_token=user_access_token,
+            embedding_provider=embedding_provider,
+            critic_model=critic_model,
+            max_refinements=max_refinements,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
         )
@@ -240,9 +278,112 @@ def run_orchestration(
         }
     )
 
-    return {
+    initial = {
         "route": output["route"],
         "route_reason": output["route_reason"],
         "retrieval": output["retrieval"],
         "answer": output["answer"],
+        "tool_decisions": (
+            ToolDecision(tool_name="router", rationale=output["route_reason"]),
+            ToolDecision(tool_name="retrieval", rationale=f"route={output['route']}"),
+            ToolDecision(
+                tool_name="synthesis",
+                rationale=f"confidence={output['answer'].confidence}",
+            ),
+        ),
+    }
+
+    return _maybe_refine(
+        question=question,
+        initial=initial,
+        store=store,
+        user_id=user_id,
+        user_access_token=user_access_token,
+        embedding_provider=embedding_provider,
+        critic_model=critic_model,
+        max_refinements=max_refinements,
+        supabase_store=supabase_store,
+        neo4j_store=neo4j_store,
+    )
+
+
+def _maybe_refine(
+    *,
+    question: str,
+    initial: OrchestrationResult,
+    store: RuntimeStore,
+    user_id: str | None,
+    user_access_token: str | None,
+    embedding_provider: EmbeddingProvider,
+    critic_model: CriticModel,
+    max_refinements: int,
+    supabase_store: SupabaseVectorStore | None,
+    neo4j_store: Neo4jGraphStore | None,
+) -> OrchestrationResult:
+    current = initial
+    decisions = list(current["tool_decisions"])
+    refinement_budget = max(0, max_refinements)
+
+    for _ in range(refinement_budget):
+        if current["route"] not in {"document", "graph"}:
+            decisions.append(
+                ToolDecision(
+                    tool_name="critic",
+                    rationale="no refinement needed for current route",
+                )
+            )
+            break
+
+        top_score = (
+            current["retrieval"].hits[0].score if current["retrieval"].hits else 0.0
+        )
+        hit_count = len(current["retrieval"].hits)
+        critique = critic_model.evaluate(
+            question=question,
+            route=current["route"],
+            top_score=top_score,
+            hit_count=hit_count,
+        )
+
+        if not critique.should_refine:
+            decisions.append(
+                ToolDecision(tool_name="critic", rationale=critique.reason)
+            )
+            break
+
+        refined_retrieval = retrieve(
+            store=store,
+            route="hybrid",
+            query=question,
+            user_id=user_id,
+            user_access_token=user_access_token,
+            embedding_provider=embedding_provider,
+            supabase_store=supabase_store,
+            neo4j_store=neo4j_store,
+        )
+        refined_answer = build_answer(question, refined_retrieval)
+        decisions.append(ToolDecision(tool_name="critic", rationale=critique.reason))
+        decisions.append(
+            ToolDecision(
+                tool_name="retrieval_refine",
+                rationale="rerouted to hybrid for stronger evidence",
+            )
+        )
+        current = {
+            "route": "hybrid",
+            "route_reason": "critic requested hybrid refinement",
+            "retrieval": refined_retrieval,
+            "answer": refined_answer,
+            "tool_decisions": tuple(decisions),
+        }
+
+    if not decisions:
+        return current
+
+    return {
+        "route": current["route"],
+        "route_reason": current["route_reason"],
+        "retrieval": current["retrieval"],
+        "answer": current["answer"],
+        "tool_decisions": tuple(decisions),
     }

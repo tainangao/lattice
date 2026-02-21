@@ -60,8 +60,13 @@ uv run uvicorn main:app --reload
 
 - `SUPABASE_ANON_KEY` (required for PostgREST/RPC with user JWT)
 - `EMBEDDING_DIMENSIONS` (default `1536`)
+- `EMBEDDING_BACKEND` (`deterministic` or `google`)
+- `GEMINI_EMBEDDING_MODEL` (default `models/gemini-embedding-001`)
 - `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`
 - `ENABLE_LANGGRAPH` (default `true`; falls back safely if package unavailable)
+- `CRITIC_BACKEND` (`deterministic` or `google`)
+- `CRITIC_MODEL` (default `gemini-2.5-flash`)
+- `CRITIC_MAX_REFINEMENTS` (default `1`)
 
 ## Rebuild Source of Truth
 

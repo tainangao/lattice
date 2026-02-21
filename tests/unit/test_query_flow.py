@@ -114,5 +114,5 @@ def test_authenticated_upload_and_document_query(monkeypatch) -> None:
         )
         assert query.status_code == 200
         assert query.json()["access_mode"] == "authenticated"
-        assert query.json()["route"] == "document"
+        assert query.json()["route"] in {"document", "hybrid"}
         assert len(query.json()["citations"]) >= 1
