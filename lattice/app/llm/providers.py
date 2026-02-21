@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 
 
@@ -86,9 +87,12 @@ def build_critic_model(
     backend: str,
     model: str,
 ) -> CriticModel:
-    if backend == "google" and runtime_key:
+    resolved_key = (
+        runtime_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    )
+    if backend == "google" and resolved_key:
         try:
-            return GeminiCriticModel(api_key=runtime_key, model=model)
+            return GeminiCriticModel(api_key=str(resolved_key), model=model)
         except Exception:
             return DeterministicCriticModel()
     return DeterministicCriticModel()

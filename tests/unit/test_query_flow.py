@@ -71,6 +71,19 @@ def test_runtime_key_lifecycle() -> None:
         assert clear_response.json()["has_key"] is False
 
 
+def test_runtime_key_uses_environment_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "env-gemini-key")
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/query",
+            json={"question": "show graph dependencies for project alpha"},
+            headers={"X-Demo-Session": "demo-env-key"},
+        )
+        assert response.status_code == 200
+        assert response.json()["runtime_key_source"] == "environment"
+
+
 def test_authenticated_upload_and_document_query(monkeypatch) -> None:
     def fake_verify(authorization: str | None, _settings) -> AuthContext:
         assert authorization == "Bearer test-token"

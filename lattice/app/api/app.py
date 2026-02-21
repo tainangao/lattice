@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from contextlib import asynccontextmanager
 from uuid import uuid4
@@ -303,14 +304,19 @@ def create_app() -> FastAPI:
                 )
 
         runtime_key = runtime_store.runtime_keys_by_session.get(demo_session_id)
+        env_runtime_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        resolved_runtime_key = runtime_key or env_runtime_key
+        runtime_key_source = (
+            "session" if runtime_key else ("environment" if env_runtime_key else "none")
+        )
         runtime_embedding_provider = build_runtime_embedding_provider(
             dimensions=config.embedding_dimensions,
-            runtime_key=runtime_key,
+            runtime_key=resolved_runtime_key,
             model=config.gemini_embedding_model,
             backend=config.embedding_backend,
         )
         critic_model = build_critic_model(
-            runtime_key=runtime_key,
+            runtime_key=resolved_runtime_key,
             backend=config.critic_backend,
             model=config.critic_model,
         )
@@ -386,6 +392,7 @@ def create_app() -> FastAPI:
         return {
             "thread_id": thread_id,
             "access_mode": access_mode,
+            "runtime_key_source": runtime_key_source,
             "resolved_question": resolved_question,
             "route": result["route"],
             "route_reason": result["route_reason"],

@@ -73,13 +73,16 @@ def build_runtime_embedding_provider(
     model: str,
     backend: str,
 ) -> EmbeddingProvider:
-    should_use_google = backend == "google" and bool(runtime_key)
+    resolved_key = (
+        runtime_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    )
+    should_use_google = backend == "google" and bool(resolved_key)
     if not should_use_google:
         return DeterministicEmbeddingProvider(dimensions=dimensions)
 
     try:
         return GoogleGenerativeAIEmbeddingProvider(
-            api_key=runtime_key or os.getenv("GOOGLE_API_KEY", ""),
+            api_key=str(resolved_key),
             model=model,
             dimensions=dimensions,
         )

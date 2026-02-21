@@ -36,6 +36,19 @@ uv sync
 uv run uvicorn main:app --reload
 ```
 
+Optional: run Chainlit UI (step-level traces):
+
+```bash
+uv run chainlit run lattice/ui_chainlit/app.py
+```
+
+Chainlit auth commands:
+
+- `/auth login <email> <password>`
+- `/auth refresh`
+- `/auth status`
+- `/auth clear`
+
 3. Verify bootstrap endpoints:
 
 - `GET /`
@@ -76,7 +89,9 @@ uv run python scripts/eval/run_offline_eval.py
 - `CRITIC_BACKEND` (`deterministic` or `google`)
 - `CRITIC_MODEL` (default `gemini-2.5-flash`)
 - `CRITIC_MAX_REFINEMENTS` (default `1`)
+- `GEMINI_API_KEY` (optional env fallback when session runtime key is not set)
 
 ## Rebuild Source of Truth
 
 - Product requirements: `Docs/PRD.md`
+- Deployment runbook: `Docs/huggingface_spaces_runbook.md`
