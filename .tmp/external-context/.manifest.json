@@ -1,76 +1,22 @@
 {
   "version": "1.0",
-  "last_updated": "2026-02-19",
+  "last_updated": "2026-02-20T00:00:00Z",
   "libraries": {
-    "fastapi": {
+    "supabase": {
       "files": [
         {
-          "filename": "local-dev-install-and-import-resolution.md",
-          "topic": "local dev installation and import resolution",
-          "tech_stack": "Python local development",
-          "fetched": "2026-02-18",
-          "source": "Context7 API",
-          "path": ".tmp/external-context/fastapi/local-dev-install-and-import-resolution.md"
-        }
-      ]
-    },
-    "pip": {
-      "files": [
+          "filename": "jwks-jwt-verification-fastapi-python.md",
+          "topic": "JWKS verification in Python/FastAPI",
+          "tech_stack": "Supabase + FastAPI + PyJWT",
+          "fetched": "2026-02-20T00:00:00Z",
+          "source": "Context7 API + official docs"
+        },
         {
-          "filename": "editable-install-gotchas.md",
-          "topic": "editable installs with pyproject.toml (PEP 660) gotchas",
-          "tech_stack": "Python packaging",
-          "fetched": "2026-02-18",
-          "source": "Context7 API",
-          "path": ".tmp/external-context/pip/editable-install-gotchas.md"
-        }
-      ]
-    },
-    "agentic-rag-python": {
-      "files": [
-        {
-          "filename": "phase1-quickstart-patterns.md",
-          "topic": "phase1 quickstart patterns",
-          "tech_stack": "unknown",
-          "fetched": "unknown",
-          "source": "unknown",
-          "path": ".tmp/external-context/agentic-rag-python/phase1-quickstart-patterns.md"
-        }
-      ]
-    },
-    "uv-grpcio": {
-      "files": [
-        {
-          "filename": "uv-sync-grpcio-binary-wheel-strategies.md",
-          "topic": "avoid grpcio source builds on macOS Python 3.11 with uv sync",
-          "tech_stack": "uv + Python packaging on macOS",
-          "fetched": "2026-02-18",
-          "source": "Context7 API + PyPI JSON API",
-          "path": ".tmp/external-context/uv-grpcio/uv-sync-grpcio-binary-wheel-strategies.md"
-        }
-      ]
-    },
-    "grpcio": {
-      "files": [
-        {
-          "filename": "macos-cp311-wheel-versions-and-opentelemetry-compat.md",
-          "topic": "macOS CPython 3.11 wheel coverage and transitive pin compatibility",
-          "tech_stack": "uv + Python packaging on macOS",
-          "fetched": "2026-02-18",
-          "source": "PyPI JSON API",
-          "path": ".tmp/external-context/grpcio/macos-cp311-wheel-versions-and-opentelemetry-compat.md"
-        }
-      ]
-    },
-    "neo4j-graphrag": {
-      "files": [
-        {
-          "filename": "phase3-hybrid-retrieval-driver-integration.md",
-          "topic": "HybridRetriever + vector/graph traversal patterns + retrieval depth + driver integration",
-          "tech_stack": "Python + Neo4j GraphRAG + Neo4j Python Driver",
-          "fetched": "2026-02-19",
-          "source": "Context7 API",
-          "path": ".tmp/external-context/neo4j-graphrag/phase3-hybrid-retrieval-driver-integration.md"
+          "filename": "token-error-handling-secure-logging.md",
+          "topic": "Auth error handling and secure logging",
+          "tech_stack": "FastAPI + OWASP",
+          "fetched": "2026-02-20T00:00:00Z",
+          "source": "Official docs"
         }
       ]
     }

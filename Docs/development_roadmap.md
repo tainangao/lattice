@@ -180,7 +180,15 @@ This roadmap is organized to deliver visible user results early, then incrementa
 
 **Goal:** Close core product gaps for authenticated private document workflows.
 
-**Status (2026-02-20):** Planned.
+**Status (2026-02-20):** In progress.
+
+* **Progress update (2026-02-20):**
+* **Done:** private upload API + Chainlit upload trigger are implemented for authenticated workflows.
+* **Done:** user-scoped retrieval plumbing is implemented for private document retrieval.
+* **Done:** Supabase JWT verification is enforced in API private flows via JWKS-based signature/claim validation.
+* **Done:** runtime user identity is derived from verified token subject claim (`sub`); `X-User-Id` trust is removed.
+* **Done:** auth/upload/isolation regression tests are implemented and passing.
+* **Remaining:** production runbook hardening and environment-level verification evidence (RLS + operational checks).
 
 * **Supabase Auth cost posture (planning assumption):**
 * Phase 6 targets Supabase Free plan operation (no paid Auth dependency) while usage remains within current free quotas.

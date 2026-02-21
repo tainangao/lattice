@@ -106,6 +106,14 @@ This plan follows a prototype-first delivery sequence so stakeholders can see re
 * Add tests for login-required upload, successful authenticated ingest, and unauthorized rejection.
 * Add tests for cross-user isolation in retrieval results.
 
+#### Phase 6 Progress Update (2026-02-20)
+
+* **Completed:** private upload endpoint and Chainlit upload trigger are implemented.
+* **Completed:** user-scoped retrieval wiring is in place for private document flows.
+* **Completed:** Supabase JWT verification is enforced for private flows using JWKS-based signature/claim validation.
+* **Completed:** backend identity is derived from verified token `sub`; client-provided `X-User-Id` is no longer trusted.
+* **Completed:** focused auth/upload/isolation test coverage is added and passing.
+
 ---
 
 ## Core Agentic Architecture (LangGraph)
