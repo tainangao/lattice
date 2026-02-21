@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from io import BytesIO
 
 
@@ -7,7 +8,13 @@ class ParsingError(Exception):
     pass
 
 
-def _parse_pdf_bytes(file_bytes: bytes) -> str:
+@dataclass(frozen=True)
+class ParsedSegment:
+    page: int
+    text: str
+
+
+def _parse_pdf_bytes(file_bytes: bytes) -> list[ParsedSegment]:
     try:
         import fitz
     except Exception as exc:  # pragma: no cover - optional dependency path
@@ -15,14 +22,18 @@ def _parse_pdf_bytes(file_bytes: bytes) -> str:
 
     try:
         with fitz.open(stream=file_bytes, filetype="pdf") as document:
-            pages = [page.get_text("text") for page in document]
+            segments: list[ParsedSegment] = []
+            for index, page in enumerate(document, start=1):
+                text = page.get_text("text").strip()
+                if text:
+                    segments.append(ParsedSegment(page=index, text=text))
     except Exception as exc:
         raise ParsingError("Unable to parse PDF file") from exc
 
-    return "\n".join(section.strip() for section in pages if section.strip())
+    return segments
 
 
-def _parse_docx_bytes(file_bytes: bytes) -> str:
+def _parse_docx_bytes(file_bytes: bytes) -> list[ParsedSegment]:
     try:
         from docx import Document
     except Exception as exc:  # pragma: no cover - optional dependency path
@@ -34,12 +45,16 @@ def _parse_docx_bytes(file_bytes: bytes) -> str:
         raise ParsingError("Unable to parse DOCX file") from exc
 
     paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs]
-    return "\n".join(text for text in paragraphs if text)
+    text = "\n".join(value for value in paragraphs if value)
+    if not text:
+        return []
+    return [ParsedSegment(page=1, text=text)]
 
 
-def parse_uploaded_file(content_type: str, file_bytes: bytes) -> str:
+def parse_uploaded_file(content_type: str, file_bytes: bytes) -> list[ParsedSegment]:
     if content_type in {"text/plain", "text/markdown"}:
-        return file_bytes.decode("utf-8", errors="ignore")
+        text = file_bytes.decode("utf-8", errors="ignore")
+        return [ParsedSegment(page=1, text=text)] if text.strip() else []
     if content_type == "application/pdf":
         return _parse_pdf_bytes(file_bytes)
     if (

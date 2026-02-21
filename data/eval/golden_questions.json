@@ -1,0 +1,53 @@
+[
+  {
+    "name": "graph_dependencies",
+    "question": "show graph dependencies for project alpha",
+    "expected_routes": ["graph", "hybrid"],
+    "min_citations": 1,
+    "expected_policies": ["grounded", "degraded_answer"]
+  },
+  {
+    "name": "aggregate_count",
+    "question": "count total project dependencies",
+    "expected_routes": ["aggregate"],
+    "min_citations": 1,
+    "expected_policies": ["grounded", "degraded_answer"],
+    "required_answer_substring": "Aggregate count"
+  },
+  {
+    "name": "aggregate_full_scope_counts",
+    "question": "count total project dependencies",
+    "expected_routes": ["aggregate"],
+    "min_citations": 1,
+    "expected_policies": ["grounded", "degraded_answer"],
+    "required_answer_substring": "documents=3, graph_edges=3, total=6"
+  },
+  {
+    "name": "demo_document_scope",
+    "question": "summarize uploaded pdf document about project alpha timeline",
+    "expected_routes": ["document", "hybrid"],
+    "min_citations": 1,
+    "expected_policies": ["grounded", "degraded_answer"]
+  },
+  {
+    "name": "low_evidence_document",
+    "question": "summarize uploaded document about quantum banana lattice rockets",
+    "expected_routes": ["document", "hybrid"],
+    "min_citations": 0,
+    "expected_policies": ["low_evidence", "infra_degraded"]
+  },
+  {
+    "name": "direct_needs_context",
+    "question": "hello",
+    "expected_routes": ["direct"],
+    "min_citations": 0,
+    "expected_policies": ["needs_context"]
+  },
+  {
+    "name": "hybrid_compare",
+    "question": "compare graph relationship evidence with my uploaded report on project alpha",
+    "expected_routes": ["hybrid"],
+    "min_citations": 1,
+    "expected_policies": ["grounded", "degraded_answer"]
+  }
+]

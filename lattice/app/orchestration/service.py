@@ -62,6 +62,49 @@ def select_route(query: str) -> RouteDecision:
     return RouteDecision(path="direct", reason="no retrieval hint detected")
 
 
+def _planned_steps(route: str) -> tuple[str, ...]:
+    if route == "direct":
+        return ("synthesis",)
+    if route == "document":
+        return ("document_retrieval", "synthesis")
+    if route == "graph":
+        return ("graph_retrieval", "synthesis")
+    if route == "hybrid":
+        return (
+            "document_retrieval",
+            "graph_retrieval",
+            "hybrid_merge",
+            "synthesis",
+        )
+    if route == "aggregate":
+        return ("aggregate_retrieval", "synthesis")
+    return ("synthesis",)
+
+
+def _with_planner_decision(
+    result: OrchestrationResult,
+    *,
+    route: str,
+    planner_max_steps: int,
+) -> OrchestrationResult:
+    planned = _planned_steps(route)
+    planner_decision = ToolDecision(
+        tool_name="planner",
+        rationale=(
+            f"planned_steps={len(planned)}, max_steps={planner_max_steps}, "
+            f"plan={','.join(planned)}"
+        ),
+        status="ok",
+    )
+    return {
+        "route": result["route"],
+        "route_reason": result["route_reason"],
+        "retrieval": result["retrieval"],
+        "answer": result["answer"],
+        "tool_decisions": (planner_decision, *result["tool_decisions"]),
+    }
+
+
 def _run_without_langgraph(
     *,
     store: RuntimeStore,
@@ -71,6 +114,9 @@ def _run_without_langgraph(
     embedding_provider: EmbeddingProvider,
     supabase_store: SupabaseVectorStore | None,
     neo4j_store: Neo4jGraphStore | None,
+    rerank_backend: str,
+    rerank_model: str,
+    runtime_key: str | None,
 ) -> OrchestrationResult:
     router_started = time.perf_counter()
     route_decision = select_route(question)
@@ -86,6 +132,9 @@ def _run_without_langgraph(
         embedding_provider=embedding_provider,
         supabase_store=supabase_store,
         neo4j_store=neo4j_store,
+        rerank_backend=rerank_backend,
+        rerank_model=rerank_model,
+        runtime_key=runtime_key,
     )
     retrieval_latency_ms = int((time.perf_counter() - retrieval_started) * 1000)
 
@@ -126,10 +175,46 @@ def run_orchestration(
     embedding_provider: EmbeddingProvider,
     critic_model: CriticModel,
     max_refinements: int,
+    planner_max_steps: int,
+    rerank_backend: str,
+    rerank_model: str,
+    runtime_key: str | None,
     supabase_store: SupabaseVectorStore | None,
     neo4j_store: Neo4jGraphStore | None,
     use_langgraph: bool,
 ) -> OrchestrationResult:
+    planner_route = select_route(question)
+    plan = _planned_steps(planner_route.path)
+    budget = max(1, planner_max_steps)
+
+    if len(plan) > budget:
+        blocked_answer = AnswerEnvelope(
+            answer=(
+                "Execution stopped before retrieval because planner budget was exceeded. "
+                f"Required {len(plan)} steps but budget is {budget}."
+            ),
+            confidence="low",
+            citations=tuple(),
+            policy="planner_budget_exceeded",
+            action="Increase PLANNER_MAX_STEPS or ask a simpler question.",
+        )
+        return {
+            "route": planner_route.path,
+            "route_reason": planner_route.reason,
+            "retrieval": RetrievalBundle(route=planner_route.path, hits=tuple()),
+            "answer": blocked_answer,
+            "tool_decisions": (
+                ToolDecision(
+                    tool_name="planner",
+                    rationale=(
+                        f"budget blocked execution: planned_steps={len(plan)}, "
+                        f"max_steps={budget}"
+                    ),
+                    status="blocked",
+                ),
+            ),
+        }
+
     if not use_langgraph:
         initial = _run_without_langgraph(
             store=store,
@@ -139,8 +224,11 @@ def run_orchestration(
             embedding_provider=embedding_provider,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
         )
-        return _maybe_refine(
+        refined = _maybe_refine(
             question=question,
             initial=initial,
             store=store,
@@ -151,6 +239,14 @@ def run_orchestration(
             max_refinements=max_refinements,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
+        )
+        return _with_planner_decision(
+            refined,
+            route=refined["route"],
+            planner_max_steps=budget,
         )
 
     try:
@@ -164,8 +260,11 @@ def run_orchestration(
             embedding_provider=embedding_provider,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
         )
-        return _maybe_refine(
+        refined = _maybe_refine(
             question=question,
             initial=initial,
             store=store,
@@ -176,6 +275,14 @@ def run_orchestration(
             max_refinements=max_refinements,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
+        )
+        return _with_planner_decision(
+            refined,
+            route=refined["route"],
+            planner_max_steps=budget,
         )
 
     timings: dict[str, int] = {}
@@ -197,6 +304,9 @@ def run_orchestration(
             embedding_provider=embedding_provider,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
         )
         timings["retrieval_ms"] = int((time.perf_counter() - started) * 1000)
         return {"retrieval": retrieval}
@@ -215,6 +325,9 @@ def run_orchestration(
             embedding_provider=embedding_provider,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
         )
         timings["document_branch_ms"] = int((time.perf_counter() - started) * 1000)
         return {"doc_hits": document_bundle.hits}
@@ -233,6 +346,9 @@ def run_orchestration(
             embedding_provider=embedding_provider,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
         )
         timings["graph_branch_ms"] = int((time.perf_counter() - started) * 1000)
         return {"graph_hits": graph_bundle.hits}
@@ -352,7 +468,7 @@ def run_orchestration(
         ),
     }
 
-    return _maybe_refine(
+    refined = _maybe_refine(
         question=question,
         initial=initial,
         store=store,
@@ -363,6 +479,14 @@ def run_orchestration(
         max_refinements=max_refinements,
         supabase_store=supabase_store,
         neo4j_store=neo4j_store,
+        rerank_backend=rerank_backend,
+        rerank_model=rerank_model,
+        runtime_key=runtime_key,
+    )
+    return _with_planner_decision(
+        refined,
+        route=refined["route"],
+        planner_max_steps=budget,
     )
 
 
@@ -378,6 +502,9 @@ def _maybe_refine(
     max_refinements: int,
     supabase_store: SupabaseVectorStore | None,
     neo4j_store: Neo4jGraphStore | None,
+    rerank_backend: str,
+    rerank_model: str,
+    runtime_key: str | None,
 ) -> OrchestrationResult:
     current = initial
     decisions = list(current["tool_decisions"])
@@ -429,6 +556,9 @@ def _maybe_refine(
             embedding_provider=embedding_provider,
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
+            rerank_backend=rerank_backend,
+            rerank_model=rerank_model,
+            runtime_key=runtime_key,
         )
         refine_latency_ms = int((time.perf_counter() - refine_started) * 1000)
         refined_answer = build_answer(question, refined_retrieval)

@@ -44,9 +44,14 @@ uv run chainlit run lattice/ui_chainlit/app.py
 
 Chainlit auth commands:
 
+- `/auth signup <email> <password>`
 - `/auth login <email> <password>`
+- `/auth providers`
+- `/auth oauth <provider>`
+- `/auth callback <callback_url or tokens>`
 - `/auth refresh`
 - `/auth status`
+- `/auth set <supabase_jwt>`
 - `/auth clear`
 
 3. Verify bootstrap endpoints:
@@ -56,6 +61,11 @@ Chainlit auth commands:
 - `GET /ready`
 - `GET /api/v1/status`
 - `GET /api/v1/auth/session` (requires `Authorization: Bearer <supabase-jwt>`)
+- `GET /api/v1/auth/oauth/providers`
+- `POST /api/v1/auth/oauth/start`
+- `GET /api/v1/auth/oauth/callback`
+- `POST /api/v1/auth/oauth/complete`
+- `POST /api/v1/auth/oauth/claim`
 - `GET /api/v1/demo/quota`
 - `POST /api/v1/runtime/key`
 - `POST /api/v1/private/ingestion/upload` (requires auth)
@@ -71,12 +81,21 @@ Run the PRD regression checks locally:
 uv run python scripts/eval/run_offline_eval.py
 ```
 
+## CI Gate (same checks as GitHub Actions)
+
+```bash
+uvx ruff check .
+uv run pytest -q
+uv run python scripts/eval/run_offline_eval.py
+```
+
 ## Auth Scaffold Environment
 
 - `SUPABASE_URL` (used to derive JWKS URL)
 - `SUPABASE_JWKS_URL` (optional explicit override)
 - `SUPABASE_JWT_AUDIENCE` (optional)
 - `SUPABASE_JWT_ISSUER` (optional override)
+- `SUPABASE_OAUTH_REDIRECT_URL` (set to API callback endpoint, e.g. `http://localhost:8000/api/v1/auth/oauth/callback`)
 
 ## Retrieval and Graph Environment
 
@@ -89,6 +108,9 @@ uv run python scripts/eval/run_offline_eval.py
 - `CRITIC_BACKEND` (`deterministic` or `google`)
 - `CRITIC_MODEL` (default `gemini-2.5-flash`)
 - `CRITIC_MAX_REFINEMENTS` (default `1`)
+- `RERANK_BACKEND` (`heuristic` or `llm`)
+- `RERANK_MODEL` (default `gemini-2.5-flash`)
+- `PLANNER_MAX_STEPS` (default `6`)
 - `GEMINI_API_KEY` (optional env fallback when session runtime key is not set)
 
 ## Rebuild Source of Truth

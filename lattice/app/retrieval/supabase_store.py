@@ -55,6 +55,24 @@ class SupabaseVectorStore:
             )
         response.raise_for_status()
 
+    def count_chunks(self, *, user_jwt: str) -> int:
+        endpoint = f"{self.url.rstrip('/')}/rest/v1/embeddings"
+        headers = self._headers(user_jwt)
+        headers["Prefer"] = "count=exact"
+        with httpx.Client(timeout=20.0) as client:
+            response = client.get(
+                endpoint,
+                headers=headers,
+                params={"select": "id", "limit": "1"},
+            )
+        response.raise_for_status()
+
+        content_range = response.headers.get("content-range", "")
+        if "/" not in content_range:
+            return 0
+        total = content_range.split("/", 1)[1].strip()
+        return int(total) if total.isdigit() else 0
+
     def match_chunks(
         self,
         *,

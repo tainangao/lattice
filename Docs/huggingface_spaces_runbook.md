@@ -22,7 +22,11 @@ Set these in the Space secrets/environment:
 - `CRITIC_BACKEND`
 - `CRITIC_MODEL`
 - `CRITIC_MAX_REFINEMENTS`
+- `RERANK_BACKEND`
+- `RERANK_MODEL`
+- `PLANNER_MAX_STEPS`
 - `GEMINI_API_KEY` (optional fallback if users do not provide session keys)
+- `SUPABASE_OAUTH_REDIRECT_URL` (set to `/api/v1/auth/oauth/callback` route)
 
 ## Build and Startup
 

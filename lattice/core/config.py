@@ -22,6 +22,9 @@ class AppConfig:
     critic_backend: str
     critic_model: str
     critic_max_refinements: int
+    rerank_backend: str
+    rerank_model: str
+    planner_max_steps: int
 
 
 def load_app_config() -> AppConfig:
@@ -45,4 +48,7 @@ def load_app_config() -> AppConfig:
         critic_backend=os.getenv("CRITIC_BACKEND", "deterministic"),
         critic_model=os.getenv("CRITIC_MODEL", "gemini-2.5-flash"),
         critic_max_refinements=int(os.getenv("CRITIC_MAX_REFINEMENTS", "1")),
+        rerank_backend=os.getenv("RERANK_BACKEND", "heuristic"),
+        rerank_model=os.getenv("RERANK_MODEL", "gemini-2.5-flash"),
+        planner_max_steps=int(os.getenv("PLANNER_MAX_STEPS", "6")),
     )

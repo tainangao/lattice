@@ -72,3 +72,13 @@ class Neo4jGraphStore:
                 )
             )
         return hits
+
+    def count_edges(self) -> int:
+        statement = "MATCH ()-[rel]->() RETURN count(rel) AS edge_count"
+        with self._driver.session(database=self._settings.database) as session:
+            result = session.run(statement)
+            row = result.single()
+        if not row:
+            return 0
+        count = row.get("edge_count")
+        return int(count) if isinstance(count, int) else 0

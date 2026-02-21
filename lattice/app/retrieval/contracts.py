@@ -16,3 +16,6 @@ class RetrievalHit:
 class RetrievalBundle:
     route: str
     hits: tuple[RetrievalHit, ...]
+    degraded: bool = False
+    backend_failures: tuple[str, ...] = tuple()
+    rerank_strategy: str = "score_normalization_v2"
