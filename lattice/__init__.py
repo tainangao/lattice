@@ -1,1 +1,1 @@
-"""Lattice prototype package."""
+"""Lattice v1 package."""
