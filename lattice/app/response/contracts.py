@@ -7,3 +7,10 @@ from dataclasses import dataclass
 class Citation:
     source_id: str
     location: str
+
+
+@dataclass(frozen=True)
+class AnswerEnvelope:
+    answer: str
+    confidence: str
+    citations: tuple[Citation, ...]

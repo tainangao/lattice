@@ -7,3 +7,9 @@ from dataclasses import dataclass
 class RouteDecision:
     path: str
     reason: str
+
+
+@dataclass(frozen=True)
+class ToolDecision:
+    tool_name: str
+    rationale: str

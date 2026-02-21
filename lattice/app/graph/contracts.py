@@ -7,3 +7,11 @@ from dataclasses import dataclass
 class GraphQuery:
     cypher: str
     route: str
+
+
+@dataclass(frozen=True)
+class GraphEdge:
+    source: str
+    relationship: str
+    target: str
+    evidence: str

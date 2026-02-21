@@ -12,7 +12,7 @@ startup_duration_timeout: 45m
 
 # Lattice: Agentic Graph RAG v1 Rebuild
 
-This repository is now on a v1 rebuild track based on `Docs/new_app_requirements.md`.
+This repository is now on a v1 rebuild track based on `Docs/PRD.md`.
 
 The previous prototype has been archived on branch `archive/prototype-2026q1`.
 
@@ -43,6 +43,11 @@ uv run uvicorn main:app --reload
 - `GET /ready`
 - `GET /api/v1/status`
 - `GET /api/v1/auth/session` (requires `Authorization: Bearer <supabase-jwt>`)
+- `GET /api/v1/demo/quota`
+- `POST /api/v1/runtime/key`
+- `POST /api/v1/private/ingestion/upload` (requires auth)
+- `GET /api/v1/private/ingestion/jobs` (requires auth)
+- `POST /api/v1/query`
 
 ## Auth Scaffold Environment
 
@@ -53,5 +58,5 @@ uv run uvicorn main:app --reload
 
 ## Rebuild Source of Truth
 
-- Product requirements: `Docs/new_app_requirements.md`
+- Product requirements: `Docs/PRD.md`
 - Cleanup runbook: `Docs/rebuild_cleanup_runbook.md`

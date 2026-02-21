@@ -7,3 +7,9 @@ from dataclasses import dataclass
 class ConversationRef:
     thread_id: str
     user_id: str | None
+
+
+@dataclass(frozen=True)
+class ConversationTurn:
+    role: str
+    content: str
