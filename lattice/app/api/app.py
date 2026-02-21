@@ -30,7 +30,11 @@ from lattice.app.ingestion.service import (
     list_user_ingestion_jobs,
 )
 from lattice.app.llm.providers import build_critic_model
-from lattice.app.memory.service import append_turn, get_recent_turns
+from lattice.app.memory.service import (
+    append_turn,
+    get_recent_turns,
+    resolve_follow_up_question,
+)
 from lattice.app.observability.service import create_trace, tool_trace
 from lattice.app.orchestration.service import run_orchestration
 from lattice.app.retrieval.embeddings import (
@@ -265,12 +269,31 @@ def create_app() -> FastAPI:
             "error_message": job.error_message,
         }
 
+    @app.get("/api/v1/observability/traces")
+    async def query_traces(
+        context: AuthContext = Depends(require_auth_context),
+    ) -> dict[str, object]:
+        return {
+            "user_id": context.user_id,
+            "traces": [
+                {
+                    "trace_id": row.trace_id,
+                    "route": row.route,
+                    "confidence": row.confidence,
+                    "access_mode": row.access_mode,
+                    "latency_ms": row.latency_ms,
+                }
+                for row in runtime_store.query_trace_log[-50:]
+            ],
+        }
+
     @app.post("/api/v1/query")
     async def query(
         payload: QueryRequest,
         maybe_context: AuthContext | None = Depends(try_auth_context),
         demo_session_id: str = Header(default="anonymous", alias="X-Demo-Session"),
     ) -> dict[str, object]:
+        query_started = time.perf_counter()
         access_mode = "authenticated" if maybe_context else "demo"
         if access_mode == "demo":
             if not consume_demo_query(store=runtime_store, session_id=demo_session_id):
@@ -292,10 +315,17 @@ def create_app() -> FastAPI:
             model=config.critic_model,
         )
 
+        thread_id = payload.thread_id or f"thread-{uuid4().hex[:10]}"
+        resolved_question, resolution_note = resolve_follow_up_question(
+            store=runtime_store,
+            thread_id=thread_id,
+            question=payload.question,
+        )
+
         route_started = time.perf_counter()
         result = run_orchestration(
             store=runtime_store,
-            question=payload.question,
+            question=resolved_question,
             user_id=maybe_context.user_id if maybe_context else None,
             user_access_token=maybe_context.access_token if maybe_context else None,
             embedding_provider=runtime_embedding_provider,
@@ -307,16 +337,6 @@ def create_app() -> FastAPI:
         )
         routing_trace = tool_trace("router_orchestrator", route_started)
 
-        if access_mode == "demo" and result["route"] in {"document", "hybrid"}:
-            raise HTTPException(
-                status_code=401,
-                detail=(
-                    "Private document retrieval requires authentication. "
-                    "Sign in with Supabase Auth to upload/query private files."
-                ),
-            )
-
-        thread_id = payload.thread_id or f"thread-{uuid4().hex[:10]}"
         append_turn(
             store=runtime_store,
             thread_id=thread_id,
@@ -330,13 +350,43 @@ def create_app() -> FastAPI:
             content=result["answer"].answer,
         )
         turns = get_recent_turns(store=runtime_store, thread_id=thread_id)
+        total_latency_ms = int((time.perf_counter() - query_started) * 1000)
         trace = create_trace(
-            route=result["route"], confidence=result["answer"].confidence
+            route=result["route"],
+            confidence=result["answer"].confidence,
+            access_mode=access_mode,
+            latency_ms=max(total_latency_ms, 0),
         )
+        runtime_store.query_trace_log.append(trace)
+        if len(runtime_store.query_trace_log) > 500:
+            runtime_store.query_trace_log = runtime_store.query_trace_log[-500:]
+
+        trace_decisions = [
+            {
+                "tool_name": decision.tool_name,
+                "rationale": decision.rationale,
+                "latency_ms": decision.latency_ms,
+                "status": decision.status,
+                "attempt": decision.attempt,
+            }
+            for decision in result["tool_decisions"]
+        ]
+        if resolution_note:
+            trace_decisions.insert(
+                0,
+                {
+                    "tool_name": "memory_resolver",
+                    "rationale": resolution_note,
+                    "latency_ms": None,
+                    "status": "ok",
+                    "attempt": 1,
+                },
+            )
 
         return {
             "thread_id": thread_id,
             "access_mode": access_mode,
+            "resolved_question": resolved_question,
             "route": result["route"],
             "route_reason": result["route_reason"],
             "answer": result["answer"].answer,
@@ -349,20 +399,18 @@ def create_app() -> FastAPI:
                 "trace_id": trace.trace_id,
                 "route": trace.route,
                 "confidence": trace.confidence,
+                "access_mode": trace.access_mode,
+                "latency_ms": trace.latency_ms,
                 "tools": [
                     {
                         "tool_name": routing_trace.tool_name,
                         "latency_ms": routing_trace.latency_ms,
                         "status": routing_trace.status,
+                        "error_message": routing_trace.error_message,
+                        "attempt": routing_trace.attempt,
                     }
                 ],
-                "decisions": [
-                    {
-                        "tool_name": decision.tool_name,
-                        "rationale": decision.rationale,
-                    }
-                    for decision in result["tool_decisions"]
-                ],
+                "decisions": trace_decisions,
             },
             "memory": [{"role": turn.role, "content": turn.content} for turn in turns],
             "demo_quota_remaining": (

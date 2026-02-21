@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import operator
+import time
 from typing import Annotated, Literal
 from typing import TypedDict
 
@@ -71,7 +72,11 @@ def _run_without_langgraph(
     supabase_store: SupabaseVectorStore | None,
     neo4j_store: Neo4jGraphStore | None,
 ) -> OrchestrationResult:
+    router_started = time.perf_counter()
     route_decision = select_route(question)
+    router_latency_ms = int((time.perf_counter() - router_started) * 1000)
+
+    retrieval_started = time.perf_counter()
     retrieval = retrieve(
         store=store,
         route=route_decision.path,
@@ -82,20 +87,31 @@ def _run_without_langgraph(
         supabase_store=supabase_store,
         neo4j_store=neo4j_store,
     )
+    retrieval_latency_ms = int((time.perf_counter() - retrieval_started) * 1000)
+
+    synthesis_started = time.perf_counter()
     answer = build_answer(question, retrieval)
+    synthesis_latency_ms = int((time.perf_counter() - synthesis_started) * 1000)
     return {
         "route": route_decision.path,
         "route_reason": route_decision.reason,
         "retrieval": retrieval,
         "answer": answer,
         "tool_decisions": (
-            ToolDecision(tool_name="router", rationale=route_decision.reason),
             ToolDecision(
-                tool_name="retrieval", rationale=f"route={route_decision.path}"
+                tool_name="router",
+                rationale=route_decision.reason,
+                latency_ms=max(router_latency_ms, 0),
+            ),
+            ToolDecision(
+                tool_name="retrieval",
+                rationale=f"route={route_decision.path}",
+                latency_ms=max(retrieval_latency_ms, 0),
             ),
             ToolDecision(
                 tool_name="synthesis",
                 rationale=f"confidence={answer.confidence}",
+                latency_ms=max(synthesis_latency_ms, 0),
             ),
         ),
     }
@@ -162,11 +178,16 @@ def run_orchestration(
             neo4j_store=neo4j_store,
         )
 
+    timings: dict[str, int] = {}
+
     def router_node(state: _GraphState) -> _GraphState:
+        started = time.perf_counter()
         decision = select_route(state["question"])
+        timings["router_ms"] = int((time.perf_counter() - started) * 1000)
         return {"route": decision.path, "route_reason": decision.reason}
 
     def single_retrieval_node(state: _GraphState) -> _GraphState:
+        started = time.perf_counter()
         retrieval = retrieve(
             store=store,
             route=state["route"],
@@ -177,10 +198,13 @@ def run_orchestration(
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
         )
+        timings["retrieval_ms"] = int((time.perf_counter() - started) * 1000)
         return {"retrieval": retrieval}
 
     def document_branch_node(state: _GraphState) -> _GraphState:
+        started = time.perf_counter()
         if state["route"] not in {"document", "hybrid"}:
+            timings["document_branch_ms"] = int((time.perf_counter() - started) * 1000)
             return {"doc_hits": tuple()}
         document_bundle = retrieve(
             store=store,
@@ -192,10 +216,13 @@ def run_orchestration(
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
         )
+        timings["document_branch_ms"] = int((time.perf_counter() - started) * 1000)
         return {"doc_hits": document_bundle.hits}
 
     def graph_branch_node(state: _GraphState) -> _GraphState:
+        started = time.perf_counter()
         if state["route"] not in {"graph", "hybrid"}:
+            timings["graph_branch_ms"] = int((time.perf_counter() - started) * 1000)
             return {"graph_hits": tuple()}
         graph_bundle = retrieve(
             store=store,
@@ -207,9 +234,11 @@ def run_orchestration(
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
         )
+        timings["graph_branch_ms"] = int((time.perf_counter() - started) * 1000)
         return {"graph_hits": graph_bundle.hits}
 
     def merge_retrieval_node(state: _GraphState) -> _GraphState:
+        started = time.perf_counter()
         doc_hits = list(state.get("doc_hits", tuple()))
         graph_hits = list(state.get("graph_hits", tuple()))
 
@@ -227,6 +256,7 @@ def run_orchestration(
         for hit in ranked:
             if hit.source_id not in deduped:
                 deduped[hit.source_id] = hit
+        timings["merge_ms"] = int((time.perf_counter() - started) * 1000)
         return {
             "retrieval": RetrievalBundle(
                 route="hybrid",
@@ -245,7 +275,9 @@ def run_orchestration(
         return ["document_branch", "graph_branch"]
 
     def synthesis_node(state: _GraphState) -> _GraphState:
+        started = time.perf_counter()
         answer = build_answer(state["question"], state["retrieval"])
+        timings["synthesis_ms"] = int((time.perf_counter() - started) * 1000)
         return {"answer": answer}
 
     graph = StateGraph(_GraphState)
@@ -284,11 +316,38 @@ def run_orchestration(
         "retrieval": output["retrieval"],
         "answer": output["answer"],
         "tool_decisions": (
-            ToolDecision(tool_name="router", rationale=output["route_reason"]),
-            ToolDecision(tool_name="retrieval", rationale=f"route={output['route']}"),
+            ToolDecision(
+                tool_name="router",
+                rationale=output["route_reason"],
+                latency_ms=max(timings.get("router_ms", 0), 0),
+            ),
+            ToolDecision(
+                tool_name="retrieval",
+                rationale=f"route={output['route']}",
+                latency_ms=max(timings.get("retrieval_ms", 0), 0),
+            ),
+            ToolDecision(
+                tool_name="document_branch",
+                rationale="parallel document retrieval branch",
+                latency_ms=max(timings.get("document_branch_ms", 0), 0),
+                status="ok" if timings.get("document_branch_ms", 0) > 0 else "skipped",
+            ),
+            ToolDecision(
+                tool_name="graph_branch",
+                rationale="parallel graph retrieval branch",
+                latency_ms=max(timings.get("graph_branch_ms", 0), 0),
+                status="ok" if timings.get("graph_branch_ms", 0) > 0 else "skipped",
+            ),
+            ToolDecision(
+                tool_name="merge_retrieval",
+                rationale="hybrid merge and dedupe",
+                latency_ms=max(timings.get("merge_ms", 0), 0),
+                status="ok" if timings.get("merge_ms", 0) > 0 else "skipped",
+            ),
             ToolDecision(
                 tool_name="synthesis",
                 rationale=f"confidence={output['answer'].confidence}",
+                latency_ms=max(timings.get("synthesis_ms", 0), 0),
             ),
         ),
     }
@@ -324,12 +383,14 @@ def _maybe_refine(
     decisions = list(current["tool_decisions"])
     refinement_budget = max(0, max_refinements)
 
-    for _ in range(refinement_budget):
+    for attempt in range(1, refinement_budget + 1):
         if current["route"] not in {"document", "graph"}:
             decisions.append(
                 ToolDecision(
                     tool_name="critic",
                     rationale="no refinement needed for current route",
+                    status="skipped",
+                    attempt=attempt,
                 )
             )
             break
@@ -338,19 +399,27 @@ def _maybe_refine(
             current["retrieval"].hits[0].score if current["retrieval"].hits else 0.0
         )
         hit_count = len(current["retrieval"].hits)
+        critic_started = time.perf_counter()
         critique = critic_model.evaluate(
             question=question,
             route=current["route"],
             top_score=top_score,
             hit_count=hit_count,
         )
+        critic_latency_ms = int((time.perf_counter() - critic_started) * 1000)
 
         if not critique.should_refine:
             decisions.append(
-                ToolDecision(tool_name="critic", rationale=critique.reason)
+                ToolDecision(
+                    tool_name="critic",
+                    rationale=critique.reason,
+                    latency_ms=max(critic_latency_ms, 0),
+                    attempt=attempt,
+                )
             )
             break
 
+        refine_started = time.perf_counter()
         refined_retrieval = retrieve(
             store=store,
             route="hybrid",
@@ -361,12 +430,22 @@ def _maybe_refine(
             supabase_store=supabase_store,
             neo4j_store=neo4j_store,
         )
+        refine_latency_ms = int((time.perf_counter() - refine_started) * 1000)
         refined_answer = build_answer(question, refined_retrieval)
-        decisions.append(ToolDecision(tool_name="critic", rationale=critique.reason))
+        decisions.append(
+            ToolDecision(
+                tool_name="critic",
+                rationale=critique.reason,
+                latency_ms=max(critic_latency_ms, 0),
+                attempt=attempt,
+            )
+        )
         decisions.append(
             ToolDecision(
                 tool_name="retrieval_refine",
                 rationale="rerouted to hybrid for stronger evidence",
+                latency_ms=max(refine_latency_ms, 0),
+                attempt=attempt,
             )
         )
         current = {

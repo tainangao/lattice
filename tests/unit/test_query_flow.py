@@ -22,13 +22,14 @@ def test_demo_quota_decrements_on_query() -> None:
         assert response.status_code == 200
         assert response.json()["access_mode"] == "demo"
         assert response.json()["route"] == "graph"
+        assert response.json()["trace"]["latency_ms"] >= 0
 
         after = client.get("/api/v1/demo/quota", headers={"X-Demo-Session": "demo-1"})
         assert after.status_code == 200
         assert after.json()["remaining"] == 4
 
 
-def test_demo_mode_blocks_private_document_route() -> None:
+def test_demo_mode_can_query_shared_document_scope() -> None:
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/query",
@@ -36,8 +37,9 @@ def test_demo_mode_blocks_private_document_route() -> None:
             headers={"X-Demo-Session": "demo-2"},
         )
 
-        assert response.status_code == 401
-        assert "requires authentication" in response.json()["detail"].lower()
+        assert response.status_code == 200
+        assert response.json()["access_mode"] == "demo"
+        assert response.json()["route"] in {"document", "hybrid"}
 
 
 def test_runtime_key_lifecycle() -> None:
@@ -116,3 +118,33 @@ def test_authenticated_upload_and_document_query(monkeypatch) -> None:
         assert query.json()["access_mode"] == "authenticated"
         assert query.json()["route"] in {"document", "hybrid"}
         assert len(query.json()["citations"]) >= 1
+        assert len(query.json()["trace"]["decisions"]) >= 3
+
+
+def test_follow_up_reference_resolution_uses_memory() -> None:
+    with TestClient(app) as client:
+        first = client.post(
+            "/api/v1/query",
+            json={"question": "show graph dependencies for project alpha"},
+            headers={"X-Demo-Session": "demo-3"},
+        )
+        assert first.status_code == 200
+        thread_id = first.json()["thread_id"]
+
+        follow_up = client.post(
+            "/api/v1/query",
+            json={
+                "question": "what about that relationship evidence?",
+                "thread_id": thread_id,
+            },
+            headers={"X-Demo-Session": "demo-3"},
+        )
+        assert follow_up.status_code == 200
+        assert (
+            "Follow-up context from prior user turn"
+            in follow_up.json()["resolved_question"]
+        )
+        decision_names = {
+            row["tool_name"] for row in follow_up.json()["trace"]["decisions"]
+        }
+        assert "memory_resolver" in decision_names

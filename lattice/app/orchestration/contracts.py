@@ -13,3 +13,6 @@ class RouteDecision:
 class ToolDecision:
     tool_name: str
     rationale: str
+    latency_ms: int | None = None
+    status: str = "ok"
+    attempt: int = 1

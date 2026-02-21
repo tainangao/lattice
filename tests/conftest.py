@@ -15,3 +15,4 @@ def reset_runtime_store() -> None:
     runtime_store.runtime_keys_by_session.clear()
     runtime_store.query_embedding_cache.clear()
     runtime_store.retrieval_cache.clear()
+    runtime_store.query_trace_log.clear()

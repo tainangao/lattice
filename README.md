@@ -47,7 +47,16 @@ uv run uvicorn main:app --reload
 - `POST /api/v1/runtime/key`
 - `POST /api/v1/private/ingestion/upload` (requires auth)
 - `GET /api/v1/private/ingestion/jobs` (requires auth)
+- `GET /api/v1/observability/traces` (requires auth)
 - `POST /api/v1/query`
+
+## Offline Evaluation
+
+Run the PRD regression checks locally:
+
+```bash
+uv run python scripts/eval/run_offline_eval.py
+```
 
 ## Auth Scaffold Environment
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from lattice.app.graph.contracts import GraphEdge
 from lattice.app.ingestion.contracts import DocumentChunk, IngestionJob
 from lattice.app.memory.contracts import ConversationTurn
+from lattice.app.observability.contracts import QueryTrace
 from lattice.app.retrieval.contracts import RetrievalBundle
 
 
@@ -32,6 +33,7 @@ class RuntimeStore:
     runtime_keys_by_session: dict[str, str] = field(default_factory=dict)
     query_embedding_cache: dict[str, tuple[float, ...]] = field(default_factory=dict)
     retrieval_cache: dict[str, RetrievalBundle] = field(default_factory=dict)
+    query_trace_log: list[QueryTrace] = field(default_factory=list)
     shared_demo_documents: list[dict[str, str]] = field(default_factory=list)
     shared_graph_edges: list[GraphEdge] = field(default_factory=list)
 
