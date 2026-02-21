@@ -7,3 +7,4 @@ from dataclasses import dataclass
 class AuthContext:
     user_id: str
     access_mode: str
+    access_token: str | None = None

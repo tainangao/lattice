@@ -56,6 +56,13 @@ uv run uvicorn main:app --reload
 - `SUPABASE_JWT_AUDIENCE` (optional)
 - `SUPABASE_JWT_ISSUER` (optional override)
 
+## Retrieval and Graph Environment
+
+- `SUPABASE_ANON_KEY` (required for PostgREST/RPC with user JWT)
+- `EMBEDDING_DIMENSIONS` (default `1536`)
+- `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`
+- `ENABLE_LANGGRAPH` (default `true`; falls back safely if package unavailable)
+
 ## Rebuild Source of Truth
 
 - Product requirements: `Docs/PRD.md`

@@ -78,4 +78,8 @@ def verify_supabase_bearer_token(
     user_id = claims.get("sub")
     if not isinstance(user_id, str) or not user_id:
         raise AuthVerificationError("Token missing subject claim")
-    return AuthContext(user_id=user_id, access_mode="authenticated")
+    return AuthContext(
+        user_id=user_id,
+        access_mode="authenticated",
+        access_token=token,
+    )

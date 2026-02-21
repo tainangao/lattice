@@ -7,17 +7,31 @@ from pathlib import Path
 from lattice.app.graph.contracts import GraphEdge
 from lattice.app.ingestion.contracts import DocumentChunk, IngestionJob
 from lattice.app.memory.contracts import ConversationTurn
+from lattice.app.retrieval.contracts import RetrievalBundle
+
+
+@dataclass(frozen=True)
+class QueuedUpload:
+    job_id: str
+    user_id: str
+    filename: str
+    content_type: str
+    file_bytes: bytes
+    user_access_token: str | None
 
 
 @dataclass
 class RuntimeStore:
     ingestion_jobs: dict[str, IngestionJob] = field(default_factory=dict)
     private_chunks_by_user: dict[str, list[DocumentChunk]] = field(default_factory=dict)
+    queued_uploads: dict[str, QueuedUpload] = field(default_factory=dict)
     conversation_turns_by_thread: dict[str, list[ConversationTurn]] = field(
         default_factory=dict
     )
     demo_usage_by_session: dict[str, int] = field(default_factory=dict)
     runtime_keys_by_session: dict[str, str] = field(default_factory=dict)
+    query_embedding_cache: dict[str, tuple[float, ...]] = field(default_factory=dict)
+    retrieval_cache: dict[str, RetrievalBundle] = field(default_factory=dict)
     shared_demo_documents: list[dict[str, str]] = field(default_factory=list)
     shared_graph_edges: list[GraphEdge] = field(default_factory=list)
 

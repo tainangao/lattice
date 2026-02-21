@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import time
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
-from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from lattice.app.auth.access import (
     clear_runtime_key,
@@ -21,18 +22,20 @@ from lattice.app.auth.verify import (
     AuthVerificationError,
     verify_supabase_bearer_token,
 )
+from lattice.app.graph.neo4j_store import Neo4jGraphStore, Neo4jSettings
 from lattice.app.ingestion.service import (
-    create_ingestion_job,
+    IngestionWorker,
+    enqueue_ingestion_job,
     get_user_ingestion_job,
     list_user_ingestion_jobs,
 )
 from lattice.app.memory.service import append_turn, get_recent_turns
 from lattice.app.observability.service import create_trace, tool_trace
-from lattice.app.orchestration.service import select_route
-from lattice.app.response.service import build_answer
-from lattice.app.retrieval.service import retrieve
+from lattice.app.orchestration.service import run_orchestration
+from lattice.app.retrieval.embeddings import build_embedding_provider
+from lattice.app.retrieval.supabase_store import SupabaseVectorStore
 from lattice.app.runtime.store import runtime_store
-from lattice.core.config import load_app_config
+from lattice.core.config import AppConfig, load_app_config
 
 
 class QueryRequest(BaseModel):
@@ -45,10 +48,53 @@ class RuntimeKeyRequest(BaseModel):
     key: str | None = None
 
 
+def _build_supabase_store(config: AppConfig) -> SupabaseVectorStore | None:
+    if not config.supabase_url or not config.supabase_anon_key:
+        return None
+    return SupabaseVectorStore(
+        url=config.supabase_url, anon_key=config.supabase_anon_key
+    )
+
+
+def _build_neo4j_store(config: AppConfig) -> Neo4jGraphStore | None:
+    if not config.neo4j_uri or not config.neo4j_username or not config.neo4j_password:
+        return None
+    try:
+        return Neo4jGraphStore(
+            Neo4jSettings(
+                uri=config.neo4j_uri,
+                username=config.neo4j_username,
+                password=config.neo4j_password,
+                database=config.neo4j_database,
+            )
+        )
+    except Exception:
+        return None
+
+
 def create_app() -> FastAPI:
     config = load_app_config()
     auth_settings = load_supabase_auth_settings()
-    app = FastAPI(title=config.app_name, version=config.app_version)
+    embedding_provider = build_embedding_provider(config.embedding_dimensions)
+    supabase_store = _build_supabase_store(config)
+    neo4j_store = _build_neo4j_store(config)
+    ingestion_worker = IngestionWorker(
+        store=runtime_store,
+        embedding_provider=embedding_provider,
+        supabase_store=supabase_store,
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        await ingestion_worker.start()
+        try:
+            yield
+        finally:
+            await ingestion_worker.stop()
+            if neo4j_store:
+                neo4j_store.close()
+
+    app = FastAPI(title=config.app_name, version=config.app_version, lifespan=lifespan)
 
     def require_auth_context(
         authorization: str | None = Header(default=None, alias="Authorization"),
@@ -160,13 +206,15 @@ def create_app() -> FastAPI:
     ) -> dict[str, str | int | None]:
         file_bytes = await file.read()
         content_type = file.content_type or "application/octet-stream"
-        job = create_ingestion_job(
+        job = enqueue_ingestion_job(
             store=runtime_store,
             user_id=context.user_id,
             filename=file.filename or "uploaded-file",
             content_type=content_type,
             file_bytes=file_bytes,
+            user_access_token=context.access_token,
         )
+        await ingestion_worker.enqueue(job.job_id)
         return {
             "job_id": job.job_id,
             "status": job.status,
@@ -228,10 +276,19 @@ def create_app() -> FastAPI:
                 )
 
         route_started = time.perf_counter()
-        route_decision = select_route(payload.question)
-        routing_trace = tool_trace("router", route_started)
+        result = run_orchestration(
+            store=runtime_store,
+            question=payload.question,
+            user_id=maybe_context.user_id if maybe_context else None,
+            user_access_token=maybe_context.access_token if maybe_context else None,
+            embedding_provider=embedding_provider,
+            supabase_store=supabase_store,
+            neo4j_store=neo4j_store,
+            use_langgraph=config.enable_langgraph,
+        )
+        routing_trace = tool_trace("router_orchestrator", route_started)
 
-        if access_mode == "demo" and route_decision.path in {"document", "hybrid"}:
+        if access_mode == "demo" and result["route"] in {"document", "hybrid"}:
             raise HTTPException(
                 status_code=401,
                 detail=(
@@ -239,19 +296,6 @@ def create_app() -> FastAPI:
                     "Sign in with Supabase Auth to upload/query private files."
                 ),
             )
-
-        retrieval_started = time.perf_counter()
-        retrieval = retrieve(
-            store=runtime_store,
-            route=route_decision.path,
-            query=payload.question,
-            user_id=maybe_context.user_id if maybe_context else None,
-        )
-        retrieval_trace = tool_trace("retrieval", retrieval_started)
-
-        answer_started = time.perf_counter()
-        answer = build_answer(payload.question, retrieval)
-        synthesis_trace = tool_trace("synthesis", answer_started)
 
         thread_id = payload.thread_id or f"thread-{uuid4().hex[:10]}"
         append_turn(
@@ -264,22 +308,23 @@ def create_app() -> FastAPI:
             store=runtime_store,
             thread_id=thread_id,
             role="assistant",
-            content=answer.answer,
+            content=result["answer"].answer,
         )
         turns = get_recent_turns(store=runtime_store, thread_id=thread_id)
-
-        trace = create_trace(route=route_decision.path, confidence=answer.confidence)
+        trace = create_trace(
+            route=result["route"], confidence=result["answer"].confidence
+        )
 
         return {
             "thread_id": thread_id,
             "access_mode": access_mode,
-            "route": route_decision.path,
-            "route_reason": route_decision.reason,
-            "answer": answer.answer,
-            "confidence": answer.confidence,
+            "route": result["route"],
+            "route_reason": result["route_reason"],
+            "answer": result["answer"].answer,
+            "confidence": result["answer"].confidence,
             "citations": [
                 {"source_id": citation.source_id, "location": citation.location}
-                for citation in answer.citations
+                for citation in result["answer"].citations
             ],
             "trace": {
                 "trace_id": trace.trace_id,
@@ -290,17 +335,7 @@ def create_app() -> FastAPI:
                         "tool_name": routing_trace.tool_name,
                         "latency_ms": routing_trace.latency_ms,
                         "status": routing_trace.status,
-                    },
-                    {
-                        "tool_name": retrieval_trace.tool_name,
-                        "latency_ms": retrieval_trace.latency_ms,
-                        "status": retrieval_trace.status,
-                    },
-                    {
-                        "tool_name": synthesis_trace.tool_name,
-                        "latency_ms": synthesis_trace.latency_ms,
-                        "status": synthesis_trace.status,
-                    },
+                    }
                 ],
             },
             "memory": [{"role": turn.role, "content": turn.content} for turn in turns],

@@ -4,18 +4,16 @@ from main import app
 
 
 def test_health_returns_ok() -> None:
-    client = TestClient(app)
+    with TestClient(app) as client:
+        response = client.get("/health")
 
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.json() == {"ok": True}
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
 
 
 def test_status_reports_rebuild_phase() -> None:
-    client = TestClient(app)
+    with TestClient(app) as client:
+        response = client.get("/api/v1/status")
 
-    response = client.get("/api/v1/status")
-
-    assert response.status_code == 200
-    assert response.json()["phase"] == "rebuild"
+        assert response.status_code == 200
+        assert response.json()["phase"] == "rebuild"

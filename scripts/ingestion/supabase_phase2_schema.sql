@@ -114,3 +114,76 @@ create trigger set_embeddings_updated_at
 before update on public.embeddings
 for each row
 execute function public.set_updated_at();
+
+-- RPC helper for user-scoped upsert from authenticated clients.
+create or replace function public.upsert_embedding_chunk(
+  p_id text,
+  p_user_id uuid,
+  p_source text,
+  p_chunk_id text,
+  p_content text,
+  p_metadata jsonb,
+  p_embedding text
+)
+returns void
+language plpgsql
+security invoker
+as $$
+begin
+  insert into public.embeddings (
+    id,
+    user_id,
+    source,
+    chunk_id,
+    content,
+    metadata,
+    embedding
+  ) values (
+    p_id,
+    p_user_id,
+    p_source,
+    p_chunk_id,
+    p_content,
+    coalesce(p_metadata, '{}'::jsonb),
+    p_embedding::vector
+  )
+  on conflict (id)
+  do update set
+    source = excluded.source,
+    chunk_id = excluded.chunk_id,
+    content = excluded.content,
+    metadata = excluded.metadata,
+    embedding = excluded.embedding;
+end;
+$$;
+
+-- RPC helper for vector similarity search behind PostgREST.
+create or replace function public.match_embeddings(
+  query_embedding text,
+  match_count int default 5,
+  match_threshold float default 0.1
+)
+returns table (
+  id text,
+  source text,
+  chunk_id text,
+  content text,
+  metadata jsonb,
+  similarity float
+)
+language sql
+stable
+security invoker
+as $$
+  select
+    e.id,
+    e.source,
+    e.chunk_id,
+    e.content,
+    e.metadata,
+    1 - (e.embedding <=> query_embedding::vector) as similarity
+  from public.embeddings as e
+  where 1 - (e.embedding <=> query_embedding::vector) > match_threshold
+  order by (e.embedding <=> query_embedding::vector) asc
+  limit match_count;
+$$;
