@@ -125,7 +125,6 @@ Acceptance:
 
 - Structured telemetry for route, tools, latency, confidence, errors.
 - Offline evaluation suite (golden questions + regression checks).
-- Online guardrails dashboard for quality and incidents.
 
 Acceptance:
 
