@@ -19,6 +19,7 @@ dependencies = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "uvicorn>=0.37.0",
+    "grpcio==1.71.2",
 ]
 
 [tool.pytest.ini_options]
