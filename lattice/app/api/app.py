@@ -522,12 +522,6 @@ def create_app() -> FastAPI:
     ) -> dict[str, object]:
         query_started = time.perf_counter()
         access_mode = "authenticated" if maybe_context else "demo"
-        if access_mode == "demo":
-            if not consume_demo_query(store=runtime_store, session_id=demo_session_id):
-                raise HTTPException(
-                    status_code=429,
-                    detail="Demo quota reached. Sign in to continue with private features.",
-                )
 
         runtime_key = runtime_store.runtime_keys_by_session.get(demo_session_id)
         env_runtime_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -535,6 +529,21 @@ def create_app() -> FastAPI:
         runtime_key_source = (
             "session" if runtime_key else ("environment" if env_runtime_key else "none")
         )
+
+        if access_mode == "demo":
+            quota_is_enforced = runtime_key_source == "none"
+            if quota_is_enforced and not consume_demo_query(
+                store=runtime_store,
+                session_id=demo_session_id,
+            ):
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "Demo quota reached. Set a runtime key with `/key set <gemini_key>` "
+                        "or sign in to continue with private features."
+                    ),
+                )
+
         runtime_embedding_provider = build_runtime_embedding_provider(
             dimensions=config.embedding_dimensions,
             runtime_key=resolved_runtime_key,
@@ -657,7 +666,7 @@ def create_app() -> FastAPI:
             "memory": [{"role": turn.role, "content": turn.content} for turn in turns],
             "demo_quota_remaining": (
                 get_demo_remaining(store=runtime_store, session_id=demo_session_id)
-                if access_mode == "demo"
+                if access_mode == "demo" and runtime_key_source == "none"
                 else None
             ),
         }

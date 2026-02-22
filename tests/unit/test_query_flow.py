@@ -86,6 +86,42 @@ def test_runtime_key_uses_environment_fallback(monkeypatch) -> None:
         assert response.json()["runtime_key_source"] == "environment"
 
 
+def test_runtime_key_bypasses_demo_quota_limit() -> None:
+    with TestClient(app) as client:
+        headers = {"X-Demo-Session": "demo-key-bypass"}
+
+        for _ in range(3):
+            response = client.post(
+                "/api/v1/query",
+                json={"question": "who directed dick johnson is dead on netflix"},
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+        blocked = client.post(
+            "/api/v1/query",
+            json={"question": "who directed dick johnson is dead on netflix"},
+            headers=headers,
+        )
+        assert blocked.status_code == 429
+
+        set_key = client.post(
+            "/api/v1/runtime/key",
+            json={"action": "set", "key": "gemini-test-key"},
+            headers=headers,
+        )
+        assert set_key.status_code == 200
+
+        resumed = client.post(
+            "/api/v1/query",
+            json={"question": "who directed dick johnson is dead on netflix"},
+            headers=headers,
+        )
+        assert resumed.status_code == 200
+        assert resumed.json()["runtime_key_source"] == "session"
+        assert resumed.json()["demo_quota_remaining"] is None
+
+
 def test_authenticated_upload_and_document_query(monkeypatch) -> None:
     def fake_verify(authorization: str | None, _settings) -> AuthContext:
         assert authorization == "Bearer test-token"
