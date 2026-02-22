@@ -44,7 +44,7 @@ def test_neo4j_connection_and_query() -> None:
         )
     )
     try:
-        hits = store.search(query="project", limit=1)
+        hits = store.search(query="dick johnson", limit=1)
         assert isinstance(hits, list)
     finally:
         store.close()

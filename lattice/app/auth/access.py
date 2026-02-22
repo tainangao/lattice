@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from lattice.app.runtime.store import RuntimeStore
 
-DEFAULT_DEMO_QUOTA = 5
+DEFAULT_DEMO_QUOTA = 3
 
 
 def get_demo_remaining(*, store: RuntimeStore, session_id: str) -> int:

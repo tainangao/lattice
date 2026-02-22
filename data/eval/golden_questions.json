@@ -1,14 +1,23 @@
 [
   {
-    "name": "graph_dependencies",
-    "question": "show graph dependencies for project alpha",
+    "name": "graph_director_lookup",
+    "question": "who directed dick johnson is dead on netflix",
     "expected_routes": ["graph", "hybrid"],
     "min_citations": 1,
-    "expected_policies": ["grounded", "degraded_answer"]
+    "expected_policies": ["grounded", "degraded_answer"],
+    "required_answer_substring": "Dick Johnson Is Dead"
+  },
+  {
+    "name": "graph_country_lookup",
+    "question": "which country is blood & water associated with",
+    "expected_routes": ["graph", "hybrid"],
+    "min_citations": 1,
+    "expected_policies": ["grounded", "degraded_answer"],
+    "required_answer_substring": "Blood & Water"
   },
   {
     "name": "aggregate_count",
-    "question": "count total project dependencies",
+    "question": "count total netflix relationships",
     "expected_routes": ["aggregate"],
     "min_citations": 1,
     "expected_policies": ["grounded", "degraded_answer"],
@@ -16,7 +25,7 @@
   },
   {
     "name": "aggregate_full_scope_counts",
-    "question": "count total project dependencies",
+    "question": "count total netflix relationships",
     "expected_routes": ["aggregate"],
     "min_citations": 1,
     "expected_policies": ["grounded", "degraded_answer"],
@@ -24,7 +33,7 @@
   },
   {
     "name": "demo_document_scope",
-    "question": "summarize uploaded pdf document about project alpha timeline",
+    "question": "summarize uploaded notes about blood & water",
     "expected_routes": ["document", "hybrid"],
     "min_citations": 1,
     "expected_policies": ["grounded", "degraded_answer"]
@@ -45,7 +54,7 @@
   },
   {
     "name": "hybrid_compare",
-    "question": "compare graph relationship evidence with my uploaded report on project alpha",
+    "question": "compare graph relationship evidence with my uploaded report on dick johnson is dead",
     "expected_routes": ["hybrid"],
     "min_citations": 1,
     "expected_policies": ["grounded", "degraded_answer"]

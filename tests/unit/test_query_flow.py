@@ -12,23 +12,23 @@ def test_demo_quota_decrements_on_query() -> None:
     with TestClient(app) as client:
         before = client.get("/api/v1/demo/quota", headers={"X-Demo-Session": "demo-1"})
         assert before.status_code == 200
-        assert before.json()["remaining"] == 5
+        assert before.json()["remaining"] == 3
 
         response = client.post(
             "/api/v1/query",
-            json={"question": "show graph dependencies for project alpha"},
+            json={"question": "who directed dick johnson is dead on netflix"},
             headers={"X-Demo-Session": "demo-1"},
         )
 
         assert response.status_code == 200
         assert response.json()["access_mode"] == "demo"
-        assert response.json()["route"] == "graph"
+        assert response.json()["route"] in {"graph", "hybrid"}
         assert response.json()["trace"]["latency_ms"] >= 0
         assert response.json()["policy"] in {"grounded", "degraded_answer"}
 
         after = client.get("/api/v1/demo/quota", headers={"X-Demo-Session": "demo-1"})
         assert after.status_code == 200
-        assert after.json()["remaining"] == 4
+        assert after.json()["remaining"] == 2
 
 
 def test_demo_mode_can_query_shared_document_scope() -> None:
@@ -79,7 +79,7 @@ def test_runtime_key_uses_environment_fallback(monkeypatch) -> None:
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/query",
-            json={"question": "show graph dependencies for project alpha"},
+            json={"question": "who directed dick johnson is dead on netflix"},
             headers={"X-Demo-Session": "demo-env-key"},
         )
         assert response.status_code == 200
@@ -142,7 +142,7 @@ def test_follow_up_reference_resolution_uses_memory() -> None:
     with TestClient(app) as client:
         first = client.post(
             "/api/v1/query",
-            json={"question": "show graph dependencies for project alpha"},
+            json={"question": "who directed dick johnson is dead on netflix"},
             headers={"X-Demo-Session": "demo-3"},
         )
         assert first.status_code == 200
@@ -174,7 +174,7 @@ def test_planner_budget_can_block_execution(monkeypatch) -> None:
     with TestClient(bounded_app) as client:
         response = client.post(
             "/api/v1/query",
-            json={"question": "show graph dependencies for project alpha"},
+            json={"question": "who directed dick johnson is dead on netflix"},
             headers={"X-Demo-Session": "demo-budget"},
         )
         assert response.status_code == 200
@@ -225,7 +225,7 @@ def test_aggregate_route_reports_full_scope_counts() -> None:
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/query",
-            json={"question": "count total project dependencies"},
+            json={"question": "count total netflix relationships"},
             headers={"X-Demo-Session": "demo-aggregate"},
         )
 

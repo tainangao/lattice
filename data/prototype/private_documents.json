@@ -1,17 +1,17 @@
 [
   {
-    "source": "timeline.pdf",
-    "chunk_id": "timeline-1",
-    "content": "Project Alpha timeline targets Q2 launch and depends on Data Platform Upgrade completion."
+    "source": "netflix_notes.md",
+    "chunk_id": "netflix-note-1",
+    "content": "Dick Johnson Is Dead is a 2020 documentary film directed by Kirsten Johnson and listed as PG-13 in the Netflix catalog sample."
   },
   {
-    "source": "timeline.pdf",
-    "chunk_id": "timeline-2",
-    "content": "Integration testing is planned after Security Review and before release readiness sign-off."
+    "source": "netflix_notes.md",
+    "chunk_id": "netflix-note-2",
+    "content": "Blood & Water appears as a South African TV Show entry in the Netflix sample data with TV-MA rating and multiple seasons."
   },
   {
-    "source": "owner_notes.md",
-    "chunk_id": "owner-1",
-    "content": "Engineering owns dependency mapping while Product owns delivery milestones and change control."
+    "source": "netflix_notes.md",
+    "chunk_id": "netflix-note-3",
+    "content": "The Great British Baking Show is represented as a reality-oriented British TV title in the Netflix sample catalog."
   }
 ]

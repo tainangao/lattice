@@ -129,7 +129,7 @@ def run_offline_eval(app: FastAPI) -> dict[str, object]:
 
         first = client.post(
             "/api/v1/query",
-            json={"question": "show graph dependencies for project alpha"},
+            json={"question": "who directed dick johnson is dead on netflix"},
             headers={"X-Demo-Session": "eval-memory"},
         )
         memory_result = EvalResult(

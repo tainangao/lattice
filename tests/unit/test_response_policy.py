@@ -44,9 +44,9 @@ def test_degraded_answer_policy_with_citations() -> None:
                 RetrievalHit(
                     source_id="edge-1",
                     score=0.99,
-                    content="Project Alpha DEPENDS_ON Data Platform Upgrade",
+                    content="Kirsten Johnson DIRECTED Dick Johnson Is Dead",
                     source_type="shared_graph",
-                    location="Project Alpha-DEPENDS_ON-Data Platform Upgrade",
+                    location="Kirsten Johnson-DIRECTED-Dick Johnson Is Dead",
                 ),
             ),
             degraded=True,

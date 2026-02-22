@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import operator
+import re
 import time
 from typing import Annotated, Literal
 from typing import TypedDict
@@ -16,9 +17,58 @@ from lattice.app.retrieval.service import retrieve
 from lattice.app.retrieval.supabase_store import SupabaseVectorStore
 from lattice.app.runtime.store import RuntimeStore
 
-GRAPH_HINTS = {"graph", "relationship", "depends", "netflix", "cypher"}
+GRAPH_HINTS = {
+    "graph",
+    "relationship",
+    "depends",
+    "netflix",
+    "cypher",
+    "director",
+    "directed",
+    "actor",
+    "actors",
+    "cast",
+    "genre",
+    "country",
+    "rating",
+    "title",
+    "titles",
+    "movie",
+    "show",
+    "season",
+    "seasons",
+}
 DOC_HINTS = {"document", "doc", "pdf", "docx", "file", "notes", "report", "upload"}
 COUNT_HINTS = {"count", "how many", "number of", "total"}
+GRAPH_QUERY_PATTERNS = {
+    "who directed",
+    "who stars",
+    "who acted",
+    "cast of",
+    "genre of",
+    "what genre",
+    "which genre",
+    "what country",
+    "which country",
+    "what rating",
+    "release year",
+}
+
+
+def _contains_hint(normalized_query: str, hint: str) -> bool:
+    if " " in hint:
+        return hint in normalized_query
+    return bool(re.search(rf"\b{re.escape(hint)}\b", normalized_query))
+
+
+def _contains_any_hint(normalized_query: str, hints: set[str]) -> bool:
+    return any(_contains_hint(normalized_query, hint) for hint in hints)
+
+
+def _is_graph_domain_question(normalized_query: str) -> bool:
+    if any(pattern in normalized_query for pattern in GRAPH_QUERY_PATTERNS):
+        return True
+    return _contains_any_hint(normalized_query, GRAPH_HINTS)
 
 
 class OrchestrationResult(TypedDict):
@@ -43,9 +93,9 @@ class _GraphState(TypedDict, total=False):
 
 def select_route(query: str) -> RouteDecision:
     normalized = query.lower()
-    has_graph = any(token in normalized for token in GRAPH_HINTS)
-    has_docs = any(token in normalized for token in DOC_HINTS)
-    is_count = any(token in normalized for token in COUNT_HINTS)
+    has_graph = _is_graph_domain_question(normalized)
+    has_docs = _contains_any_hint(normalized, DOC_HINTS)
+    is_count = _contains_any_hint(normalized, COUNT_HINTS)
 
     if is_count:
         return RouteDecision(path="aggregate", reason="count-oriented request")
@@ -547,9 +597,10 @@ def _maybe_refine(
             break
 
         refine_started = time.perf_counter()
+        refine_route = "hybrid" if current["route"] == "document" else "graph"
         refined_retrieval = retrieve(
             store=store,
-            route="hybrid",
+            route=refine_route,
             query=question,
             user_id=user_id,
             user_access_token=user_access_token,
@@ -573,14 +624,14 @@ def _maybe_refine(
         decisions.append(
             ToolDecision(
                 tool_name="retrieval_refine",
-                rationale="rerouted to hybrid for stronger evidence",
+                rationale=f"rerouted to {refine_route} for stronger evidence",
                 latency_ms=max(refine_latency_ms, 0),
                 attempt=attempt,
             )
         )
         current = {
-            "route": "hybrid",
-            "route_reason": "critic requested hybrid refinement",
+            "route": refine_route,
+            "route_reason": f"critic requested {refine_route} refinement",
             "retrieval": refined_retrieval,
             "answer": refined_answer,
             "tool_decisions": tuple(decisions),

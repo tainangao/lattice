@@ -1,22 +1,22 @@
 {
   "edges": [
     {
-      "source": "Project Alpha",
-      "relationship": "DEPENDS_ON",
-      "target": "Data Platform Upgrade",
-      "evidence": "Platform migration must complete before Alpha release."
+      "source": "Kirsten Johnson",
+      "relationship": "DIRECTED",
+      "target": "Dick Johnson Is Dead",
+      "evidence": "Netflix sample row s1 links director Kirsten Johnson to Dick Johnson Is Dead."
     },
     {
-      "source": "Project Alpha",
-      "relationship": "REQUIRES",
-      "target": "Security Review",
-      "evidence": "Security sign-off is a release gate for production launch."
+      "source": "Blood & Water",
+      "relationship": "IN_COUNTRY",
+      "target": "South Africa",
+      "evidence": "Netflix sample row s2 lists South Africa as the country for Blood & Water."
     },
     {
-      "source": "Engineering",
-      "relationship": "OWNS",
-      "target": "Dependency Mapping",
-      "evidence": "Engineering team tracks system dependencies and blockers."
+      "source": "The Great British Baking Show",
+      "relationship": "IN_GENRE",
+      "target": "Reality TV",
+      "evidence": "Netflix sample row s9 includes Reality TV in listed genres."
     }
   ]
 }

@@ -27,6 +27,15 @@ STOP_WORDS = {
 }
 
 
+def _stable_edge_source_id(source: str, relationship: str, target: str) -> str:
+    normalized = re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        f"{source.lower()}-{relationship.lower()}-{target.lower()}",
+    ).strip("-")
+    return f"graph-edge:{normalized or 'unknown'}"
+
+
 def _token_overlap_score(query: str, content: str) -> float:
     query_tokens = {token for token in query.lower().split() if token}
     content_tokens = {token for token in content.lower().split() if token}
@@ -244,7 +253,7 @@ def _fallback_document_hits(
 
 def _fallback_graph_hits(store: RuntimeStore, query: str) -> list[RetrievalHit]:
     hits: list[RetrievalHit] = []
-    for index, edge in enumerate(store.shared_graph_edges, start=1):
+    for edge in store.shared_graph_edges:
         content = (
             f"{edge.source} {edge.relationship} {edge.target}. "
             f"Evidence: {edge.evidence}"
@@ -254,7 +263,11 @@ def _fallback_graph_hits(store: RuntimeStore, query: str) -> list[RetrievalHit]:
             continue
         hits.append(
             RetrievalHit(
-                source_id=f"graph-edge-{index}",
+                source_id=_stable_edge_source_id(
+                    edge.source,
+                    edge.relationship,
+                    edge.target,
+                ),
                 score=score,
                 content=content,
                 source_type="shared_graph",

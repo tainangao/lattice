@@ -11,6 +11,7 @@ The system will use a **FastAPI** backend, **LangGraph** for agentic orchestrati
 - Use agentic routing to select optimal retrieval strategy (document, graph, or hybrid)
 - Provide accurate, grounded, multi-turn answers with memory
 - Enforce secure, user-scoped access by default
+- Use a shared Netflix knowledge graph sourced from Kaggle and ingested via the repository ingestion script
 
 ---
 
@@ -45,6 +46,14 @@ To prevent dependency conflicts, the system MUST be built using the following co
 * **LLM Integration**: LangChain standard interfaces (ChatModels, Embeddings)
 * **Frontend**: Chainlit (Dockerized for HuggingFace Spaces)
 * **Identity**: Supabase Auth
+
+## 4.1) Shared Graph Data Baseline
+
+The shared Neo4j graph used for demo and graph retrieval features is explicitly defined as:
+
+* **Dataset Source**: Kaggle Netflix Shows dataset: `https://www.kaggle.com/datasets/shivamb/netflix-shows/data`
+* **Ingestion Path**: `scripts/ingestion/ingest_netflix_csv_neo4j.py`
+* **Expectation**: Product behavior and evaluation for graph routes should assume this dataset is the baseline shared graph corpus.
 
 ---
 
@@ -81,6 +90,7 @@ Acceptance:
 
 - Document retrieval: pgvector similarity + metadata filters + rerank.
 - Graph retrieval: Cypher + graph-specific retrieval strategy.
+- Graph-related question handling must target result quality aligned with the Neo4j reference workflow in `https://github.com/neo4j-product-examples/neo4j-employee-graph/blob/main/module1-vector-search-w-agents.ipynb`.
 - Hybrid merge and rerank with score normalization and dedupe.
 - Retrieval must preserve source scope: private document retrieval is user-scoped; graph retrieval uses shared knowledge scope.
 - Add query/embedding caching to reduce repeated retrieval and embedding cost for semantically repeated requests.
@@ -89,6 +99,7 @@ Acceptance:
 
 - Count queries use query-specific strategy (aggregation path), not snippet truncation.
 - Retrieval result quality meets benchmark dataset thresholds.
+- Graph-route answers meet reference-quality expectations for evidence-backed graph Q&A patterns demonstrated in the Neo4j reference notebook.
 
 ## FR-4 Agentic Orchestration
 
@@ -132,14 +143,14 @@ Acceptance:
 
 ## FR-8 Onboarding and Access Modes
 
-- Provide a public demo mode for unauthenticated users with configurable session query quota.
+- Provide a public demo mode for unauthenticated users with a fixed session query quota of exactly 3 queries.
 - Preserve dual-mode UX: public demo for shared knowledge queries, authenticated mode for private file features.
 - Upload attempts in public mode must trigger clear auth escalation guidance.
 - Show remaining demo quota and clear next actions in UI.
 
 Acceptance:
 
-- Unauthenticated users can query shared graph/document demo scope up to quota.
+- Unauthenticated users can query shared graph/document demo scope for exactly 3 queries per session.
 - Private upload and private retrieval are blocked until Supabase Auth session is active.
 - Public mode never exposes private user data.
 
@@ -193,5 +204,5 @@ Acceptance:
 - Agent tool traces are visible and debuggable.
 - Benchmarks + regression tests pass in CI.
 - User journey (new user -> upload -> ask -> follow-up) passes UAT.
-- Public demo mode, quota UX, and auth escalation flow are validated.
+- Public demo mode, fixed 3-query quota UX, and auth escalation flow are validated.
 - Docker deployment to HuggingFace Spaces is documented and repeatable.
